@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room Duty Management System</title>
+    <!-- Firebase Legacy SDKs for Easy HTML Integration -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
@@ -165,7 +168,7 @@
             border-radius: var(--radius-md);
             box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
         }
-        .comp-btn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+        .comp-btn:disabled { background: #e2e2e2; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
         
         .status-msg { margin-top: 12px; font-size: 0.9rem; font-weight: 600; }
         .status-msg.locked { color: var(--danger); }
@@ -213,7 +216,6 @@
         .admin-status-badge { cursor: pointer; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; }
         .admin-status-badge:hover { filter: brightness(0.9); }
 
-        /* Floating Download Button Style */
         .download-float-btn {
             position: fixed;
             bottom: 20px;
@@ -233,13 +235,9 @@
             border: 2px solid white;
             transition: all 0.2s ease;
         }
-        .download-float-btn:hover {
-            transform: scale(1.1);
-            background: #dc2626;
-        }
+        .download-float-btn:hover { transform: scale(1.1); background: #dc2626; }
         .download-float-btn:active { transform: scale(0.95); }
 
-        /* --- 📝 HIGH PERFORMANCE PRINT CONFIGURATIONS FOR GENERATING CLEAN PDF --- */
         #printReportContainer { display: none; }
         
         @media print {
@@ -309,7 +307,7 @@
             <h2 id="welcomeUser">Welcome</h2>
             
             <div id="displayCard" class="display-system">
-                <div id="workerDisplay" class="current-worker">No Workers Added</div>
+                <div id="workerDisplay" class="current-worker">Loading Application Base...</div>
                 <div id="subMessageDisplay" class="sub-message"></div>
                 <div id="penaltyDisplay" class="penalty-text"></div>
             </div>
@@ -325,7 +323,7 @@
             <h3>📌 Important Dashboard Notes</h3>
             <div class="notes-board-panel">
                 <div class="notes-list" id="notesList">
-                    <div class="note-item" style="background:#f1f5f9; border-color:#94a3b8; text-align:center; color:#64748b">No notice board pins right now.</div>
+                    <div class="note-item" style="background:#f1f5f9; border-left:3px solid #cbd5e1; text-align:center; color:#64748b">No notice board pins right now.</div>
                 </div>
                 <textarea id="noteInput" rows="2" placeholder="Write a note to broadcast to everyone..." style="text-align:left; font-size:0.85rem; padding:10px; margin-bottom:8px; resize: none;"></textarea>
                 <button class="primary-btn" id="addNoteBtn" style="padding:8px; font-size:0.85rem; margin-bottom:0;">Pin Note to Board</button>
@@ -396,52 +394,83 @@
 
     <script>
         (function() {
+            // Live Synchronized Configurations from your Firebase Dashboard
+            const firebaseConfig = {
+                apiKey: "AIzaSyCuC79-34tkdLSM9L1i7s-zw77emi0qDt0",
+                authDomain: "room-362c3.firebaseapp.com",
+                databaseURL: "https://room-362c3-default-rtdb.firebaseio.com",
+                projectId: "room-362c3",
+                storageBucket: "room-362c3.appspot.com"
+            };
+
+            // Initialize Firebase
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+
             const ADMIN_ID = "admin";
             let isEditingMode = false;
             let isAnswerVerified = false;
 
-            let appState = JSON.parse(localStorage.getItem('teamAppState')) || {
-                rotation: [],
-                currentIndex: 0,
-                lastCompletedDate: "",
-                dateStampAssigned: "",
-                lastCompletedWorkerName: ""
-            };
-
-            let usersDatabase = JSON.parse(localStorage.getItem('teamUsersDatabase')) || {};
-            let systemNotes = JSON.parse(localStorage.getItem('teamSystemNotes')) || [];
-            let systemHistoryLogs = JSON.parse(localStorage.getItem('teamSystemHistoryLogs')) || [];
-            
-            if (!usersDatabase["admin"]) {
-                usersDatabase["admin"] = { pin: "1234", question: "What is your secret key?", answer: "surya", status: "present" };
-                localStorage.setItem('teamUsersDatabase', JSON.stringify(usersDatabase));
-            }
-
+            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
+            let usersDatabase = {};
+            let systemNotes = [];
+            let systemHistoryLogs = [];
             let activeLoggedUser = localStorage.getItem('activeTeamUser') || null;
 
-            function saveToStorage() {
-                localStorage.setItem('teamAppState', JSON.stringify(appState));
-                localStorage.setItem('teamUsersDatabase', JSON.stringify(usersDatabase));
-                localStorage.setItem('teamSystemNotes', JSON.stringify(systemNotes));
-                localStorage.setItem('teamSystemHistoryLogs', JSON.stringify(systemHistoryLogs));
-            }
+            // Live Database Real-time Sync listeners
+            db.ref('room_duty/appState').on('value', (snapshot) => {
+                if (snapshot.exists()) appState = snapshot.val();
+                if (!appState.rotation) appState.rotation = [];
+                renderUI();
+            });
+
+            db.ref('room_duty/usersDatabase').on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    usersDatabase = snapshot.val();
+                } else {
+                    // Seed initial user table values
+                    usersDatabase = {
+                        "admin": { pin: "1234", question: "What is your secret key?", answer: "surya", status: "present" },
+                        "Surya": { pin: "1234", answer: "01/01/2000", status: "present" }
+                    };
+                    db.ref('room_duty/usersDatabase').set(usersDatabase);
+                }
+                buildUserManagementTable();
+                if (activeLoggedUser) updateToggleButtonUI();
+                renderUI();
+            });
+
+            db.ref('room_duty/systemNotes').on('value', (snapshot) => {
+                systemNotes = [];
+                if (snapshot.exists()) {
+                    snapshot.forEach((child) => { systemNotes.unshift(child.val()); });
+                }
+                renderNotes();
+            });
+
+            db.ref('room_duty/systemHistoryLogs').on('value', (snapshot) => {
+                systemHistoryLogs = [];
+                if (snapshot.exists()) {
+                    snapshot.forEach((child) => { systemHistoryLogs.unshift(child.val()); });
+                }
+                renderReportTable();
+                checkAndLogRollovers();
+            });
+
+            function pushAppState() { db.ref('room_duty/appState').set(appState); }
+            function pushUsersDatabase() { db.ref('room_duty/usersDatabase').set(usersDatabase); }
 
             window.showScreen = function(screenId) {
                 document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
                 document.getElementById(screenId).classList.add('active');
                 
                 const dlBtn = document.getElementById('downloadCsvBtn');
-                if (screenId === 'dashboardScreen') {
-                    dlBtn.style.display = "flex";
-                } else {
-                    dlBtn.style.display = "none";
-                }
+                dlBtn.style.display = (screenId === 'dashboardScreen') ? "flex" : "none";
             }
 
             function maskAsDateFormat(e) {
                 const targetUser = document.getElementById('forgotName').value || "";
                 if (targetUser.toLowerCase() === ADMIN_ID) return;
-                
                 let v = e.target.value.replace(/\D/g, '');
                 if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
                 if (v.length > 5) v = v.slice(0, 5) + '/' + v.slice(5, 9);
@@ -463,7 +492,6 @@
                 if(!registeredName) return alert("User name not found.");
 
                 document.getElementById('forgotName').value = registeredName;
-                
                 if (registeredName.toLowerCase() === ADMIN_ID) {
                     document.getElementById('recoveryQuestionText').innerText = `Question: ${usersDatabase[registeredName].question}`;
                     document.getElementById('recoveryAnswer').placeholder = "Enter secret answer";
@@ -500,7 +528,6 @@
 
             document.getElementById('recoverBtn').addEventListener('click', () => {
                 const name = document.getElementById('forgotName').value;
-                
                 if (!isAnswerVerified) {
                     const ansInput = document.getElementById('recoveryAnswer').value.trim();
                     if(ansInput.toLowerCase() === usersDatabase[name].answer.toLowerCase()) {
@@ -513,11 +540,10 @@
                     }
                 } else {
                     const targetNewPin = document.getElementById('recoveredNewPin').value;
-                    if (targetNewPin.length !== 4 || isNaN(targetNewPin)) {
-                        return alert("New PIN must be a 4-digit number.");
-                    }
+                    if (targetNewPin.length !== 4 || isNaN(targetNewPin)) return alert("New PIN must be a 4-digit number.");
+                    
                     usersDatabase[name].pin = targetNewPin;
-                    saveToStorage();
+                    pushUsersDatabase();
                     alert("🎉 PIN updated successfully!");
                     exitRecoveryFlow();
                 }
@@ -544,27 +570,23 @@
                 
                 if (!appState.dateStampAssigned) {
                     appState.dateStampAssigned = getTodayString();
-                    saveToStorage();
+                    pushAppState();
                 }
 
                 if (isUserAdmin) {
                     document.getElementById('adminPanel').classList.add('is-admin');
                     document.getElementById('lineupSection').style.display = "block";
                     document.getElementById('userStatusToggle').style.display = "none";
-                    buildUserManagementTable();
                 } else {
                     document.getElementById('adminPanel').classList.remove('is-admin');
                     document.getElementById('userStatusToggle').style.display = "block";
                     updateToggleButtonUI();
                 }
-                renderUI();
-                renderNotes();
-                renderReportTable();
-                checkAndLogRollovers();
             }
 
             function updateToggleButtonUI() {
                 const btn = document.getElementById('userStatusToggle');
+                if (!usersDatabase[activeLoggedUser]) return;
                 const currentStatus = usersDatabase[activeLoggedUser].status || "present";
                 if(currentStatus === "present") {
                     btn.innerText = "🟢 Present";
@@ -580,40 +602,34 @@
                 const newStatus = (currentStatus === "present") ? "absent" : "present";
                 
                 usersDatabase[activeLoggedUser].status = newStatus;
+                pushUsersDatabase();
                 
-                if (newStatus === "absent") {
-                    addLogEntry(getTodayString(), activeLoggedUser, "Marked Absent");
-                } else {
-                    addLogEntry(getTodayString(), activeLoggedUser, "Returned Present");
-                }
-
-                saveToStorage();
-                updateToggleButtonUI();
-                renderUI();
-                renderReportTable();
+                addLogEntry(getTodayString(), activeLoggedUser, newStatus === "absent" ? "Marked Absent" : "Returned Present");
             });
 
             function syncRotationList() {
-                appState.rotation = Object.keys(usersDatabase).filter(u => {
+                const updatedRotation = Object.keys(usersDatabase).filter(u => {
                     return u.toLowerCase() !== ADMIN_ID && (usersDatabase[u].status !== "absent");
                 });
-                saveToStorage();
+                
+                if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
+                    appState.rotation = updatedRotation;
+                    pushAppState();
+                }
             }
 
             function checkAndLogRollovers() {
                 const todayStr = getTodayString();
-                if (appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr && appState.lastCompletedDate !== appState.dateStampAssigned) {
+                if (appState.rotation && appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr && appState.lastCompletedDate !== appState.dateStampAssigned) {
                     const missingWorker = appState.rotation[appState.currentIndex];
                     addLogEntry(appState.dateStampAssigned, missingWorker, "Missed Shift (Rollover)");
-                    renderReportTable();
                 }
             }
 
             function addLogEntry(date, name, statusText) {
                 const exists = systemHistoryLogs.some(log => log.date === date && log.name === name && log.status === statusText);
                 if (!exists) {
-                    systemHistoryLogs.unshift({ date, name, status: statusText });
-                    saveToStorage();
+                    db.ref('room_duty/systemHistoryLogs').push({ date, name, status: statusText });
                 }
             }
 
@@ -628,7 +644,7 @@
                 const compBtn = document.getElementById('compBtn');
                 const statusMsg = document.getElementById('statusMsg');
 
-                if (appState.rotation.length === 0) {
+                if (!appState.rotation || appState.rotation.length === 0) {
                     workerDisplay.innerText = "Lineup Empty";
                     subMessageDisplay.innerText = "Everyone is absent or no workers exist.";
                     penaltyDisplay.style.display = "none";
@@ -664,7 +680,6 @@
 
                     if (isMyTurn) {
                         workerDisplay.innerText = "Your Turn Today!";
-                        
                         if (appState.dateStampAssigned !== todayStr) {
                             subMessageDisplay.innerText = "⚠️ Shift Obligation Active";
                             penaltyDisplay.innerText = "🚨 You did not click COMPLETE yesterday! You must do the work again today.";
@@ -707,9 +722,7 @@
                 appState.lastCompletedDate = todayStr;
                 appState.dateStampAssigned = todayStr;
                 
-                saveToStorage();
-                renderUI();
-                renderReportTable();
+                pushAppState();
             });
 
             document.getElementById('addNoteBtn').addEventListener('click', () => {
@@ -717,21 +730,18 @@
                 if (!text) return alert("Please enter some note content first!");
                 
                 const timestamp = new Date().toLocaleString();
-                systemNotes.unshift({
+                db.ref('room_duty/systemNotes').push({
                     user: activeLoggedUser || "Unknown User",
                     text: text,
                     time: timestamp
                 });
-                
                 document.getElementById('noteInput').value = "";
-                saveToStorage();
-                renderNotes();
             });
 
             function renderNotes() {
                 const notesList = document.getElementById('notesList');
                 if (systemNotes.length === 0) {
-                    notesList.innerHTML = `<div class="note-item" style="background:#f1f5f9; border-color:#94a3b8; text-align:center; color:#64748b">No notice board pins right now.</div>`;
+                    notesList.innerHTML = `<div class="note-item" style="background:#f1f5f9; border-left:3px solid #cbd5e1; text-align:center; color:#64748b">No notice board pins right now.</div>`;
                     return;
                 }
                 notesList.innerHTML = systemNotes.map(n => `
@@ -763,11 +773,8 @@
                 }).join('');
             }
 
-            // --- 🖨️ TRIGGER PDF GENERATION FLOW ---
             document.getElementById('downloadCsvBtn').addEventListener('click', () => {
                 if(systemHistoryLogs.length === 0) return alert("No tracking rows found to compile into a PDF document.");
-                
-                // Populate print container workspace before triggering layout capture
                 document.getElementById('printGeneratedMeta').innerText = `Generated on: ${new Date().toLocaleString()}`;
                 
                 const printBody = document.getElementById('printTableBody');
@@ -779,7 +786,6 @@
                     </tr>
                 `).join('');
                 
-                // Execute native print rendering engine to capture the standalone CSS page setup
                 window.print();
             });
 
@@ -809,7 +815,6 @@
                     } else {
                         usersDatabase[name] = { pin, answer: ans, status: savedStatus };
                     }
-                    
                     alert("Profile updated successfully!");
                     exitEditingState();
                 } else {
@@ -819,14 +824,13 @@
                     alert(`${name} successfully added!`);
                 }
                 
-                saveToStorage();
-                renderUI();
-                buildUserManagementTable();
+                pushUsersDatabase();
                 clearFormInputs();
             });
 
             function buildUserManagementTable() {
                 const tbody = document.getElementById('adminTableBody');
+                if (!tbody) return;
                 tbody.innerHTML = "";
 
                 for (let u in usersDatabase) {
@@ -858,17 +862,13 @@
 
             window.toggleStatusViaAdmin = function(targetUser) {
                 if (targetUser.toLowerCase() === ADMIN_ID) return;
-                
                 const currentStatus = usersDatabase[targetUser].status || "present";
                 const nStatus = (currentStatus === "present") ? "absent" : "present";
+                
                 usersDatabase[targetUser].status = nStatus;
+                pushUsersDatabase();
                 
                 addLogEntry(getTodayString(), targetUser, nStatus === "absent" ? "Absent via Admin" : "Present via Admin");
-                
-                saveToStorage();
-                buildUserManagementTable();
-                renderUI();
-                renderReportTable();
             }
 
             window.triggerEditUser = function(name) {
@@ -901,13 +901,7 @@
             window.triggerDeleteUser = function(name) {
                 if(name.toLowerCase() === ADMIN_ID) return alert("Admin profiles cannot be wiped!");
                 if(confirm(`Are you sure you want to remove ${name}?`)) {
-                    delete usersDatabase[name];
-                    syncRotationList();
-                    if (appState.currentIndex >= appState.rotation.length) appState.currentIndex = 0;
-                    
-                    saveToStorage();
-                    renderUI();
-                    buildUserManagementTable();
+                    db.ref('room_duty/usersDatabase/' + name).remove();
                 }
             }
 
@@ -933,7 +927,7 @@
             document.getElementById('cancelEditBtn').addEventListener('click', exitEditingState);
 
             document.getElementById('forceSkipBtn').addEventListener('click', () => {
-                if (appState.rotation.length === 0) return;
+                if (!appState.rotation || appState.rotation.length === 0) return;
                 const skippedWorker = appState.rotation[appState.currentIndex];
                 
                 addLogEntry(getTodayString(), skippedWorker, "Forced Skip");
@@ -942,30 +936,31 @@
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
                 appState.dateStampAssigned = getTodayString();
                 
-                saveToStorage();
-                renderUI();
-                renderReportTable();
+                pushAppState();
             });
 
             document.getElementById('resetLockBtn').addEventListener('click', () => {
                 appState.lastCompletedDate = "";
-                saveToStorage();
-                renderUI();
+                pushAppState();
                 alert("Date lock cleared!");
             });
 
             document.getElementById('clearAllBtn').addEventListener('click', () => {
-                if (confirm("Reset everything? This deletes all users except the master Admin configuration settings.")) {
-                    localStorage.clear();
-                    location.reload();
+                if (confirm("Reset everything? This wipes all synchronized cloud parameters and historical branches.")) {
+                    db.ref('room_duty').remove().then(() => {
+                        localStorage.clear();
+                        location.reload();
+                    });
                 }
             });
 
-            if (activeLoggedUser && usersDatabase[activeLoggedUser]) {
-                setupDashboard(activeLoggedUser);
-            } else {
-                showScreen('loginScreen');
-            }
+            setTimeout(() => {
+                if (activeLoggedUser) {
+                    setupDashboard(activeLoggedUser);
+                } else {
+                    showScreen('loginScreen');
+                }
+            }, 800);
         })();
     </script>
 </body>
