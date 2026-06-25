@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room Duty Management System</title>
-    <!-- Firebase Legacy SDKs for Easy HTML Integration -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
@@ -122,8 +121,21 @@
         .display-system.duty-done .current-worker { color: #14532d; font-size: 1.8rem; }
 
         .sub-message { font-size: 1rem; color: var(--text-muted); margin-top: 12px; font-weight: 600; }
-        .display-system.duty-done .sub-message { color: #15803d; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 20px; display: inline-block; margin-top: 14px; border: 1px solid rgba(22,163,74,0.15); text-transform: capitalize; }
         
+        .tomorrow-badge {
+            margin-top: 14px;
+            background: #ffffff;
+            padding: 10px 16px;
+            border-radius: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(22, 163, 74, 0.2);
+            font-weight: 700;
+            color: #15803d;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
         .penalty-text { color: var(--danger); font-weight: 700; font-size: 0.95rem; margin-top: 12px; line-height: 1.4; padding: 8px; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; }
 
         input, textarea { 
@@ -394,7 +406,6 @@
 
     <script>
         (function() {
-            // Live Synchronized Configurations from your Firebase Dashboard
             const firebaseConfig = {
                 apiKey: "AIzaSyCuC79-34tkdLSM9L1i7s-zw77emi0qDt0",
                 authDomain: "room-362c3.firebaseapp.com",
@@ -403,7 +414,6 @@
                 storageBucket: "room-362c3.appspot.com"
             };
 
-            // Initialize Firebase
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
 
@@ -417,7 +427,8 @@
             let systemHistoryLogs = [];
             let activeLoggedUser = localStorage.getItem('activeTeamUser') || null;
 
-            // Live Database Real-time Sync listeners
+            const DESIRED_ORDER = ["Surya", "Lucky", "Swaraj", "Swadesh"];
+
             db.ref('room_duty/appState').on('value', (snapshot) => {
                 if (snapshot.exists()) appState = snapshot.val();
                 if (!appState.rotation) appState.rotation = [];
@@ -428,10 +439,12 @@
                 if (snapshot.exists()) {
                     usersDatabase = snapshot.val();
                 } else {
-                    // Seed initial user table values
                     usersDatabase = {
                         "admin": { pin: "1234", question: "What is your secret key?", answer: "surya", status: "present" },
-                        "Surya": { pin: "1234", answer: "01/01/2000", status: "present" }
+                        "Surya": { pin: "1234", answer: "01/01/2000", status: "present" },
+                        "Lucky": { pin: "1234", answer: "01/01/2000", status: "present" },
+                        "Swaraj": { pin: "1234", answer: "01/01/2000", status: "present" },
+                        "Swadesh": { pin: "1234", answer: "01/01/2000", status: "present" }
                     };
                     db.ref('room_duty/usersDatabase').set(usersDatabase);
                 }
@@ -608,8 +621,13 @@
             });
 
             function syncRotationList() {
-                const updatedRotation = Object.keys(usersDatabase).filter(u => {
-                    return u.toLowerCase() !== ADMIN_ID && (usersDatabase[u].status !== "absent");
+                const presentUsers = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID && usersDatabase[u].status !== "absent");
+                const updatedRotation = DESIRED_ORDER.filter(user => presentUsers.some(p => p.toLowerCase() === user.toLowerCase()));
+                
+                presentUsers.forEach(u => {
+                    if (!DESIRED_ORDER.some(d => d.toLowerCase() === u.toLowerCase())) {
+                        updatedRotation.push(u);
+                    }
                 });
                 
                 if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
@@ -627,10 +645,7 @@
             }
 
             function addLogEntry(date, name, statusText) {
-                const exists = systemHistoryLogs.some(log => log.date === date && log.name === name && log.status === statusText);
-                if (!exists) {
-                    db.ref('room_duty/systemHistoryLogs').push({ date, name, status: statusText });
-                }
+                db.ref('room_duty/systemHistoryLogs').push({ date, name, status: statusText });
             }
 
             function renderUI() {
@@ -667,7 +682,7 @@
                 if (appState.lastCompletedDate === todayStr) {
                     displayCard.className = "display-system duty-done";
                     workerDisplay.innerHTML = `🎉 ${appState.lastCompletedWorkerName} Completed Work!`;
-                    subMessageDisplay.innerHTML = `👉 Tomorrow: <strong>${currentWorkerName}'s</strong> Work.`;
+                    subMessageDisplay.innerHTML = `<div class="tomorrow-badge">👉 Tomorrow: ${currentWorkerName}'s Work.</div>`;
                     penaltyDisplay.style.display = "none";
                     
                     compBtn.disabled = true;
@@ -761,7 +776,7 @@
                 tbody.innerHTML = systemHistoryLogs.map(row => {
                     let badgeClass = "absent";
                     if(row.status === "Duty Done" || row.status === "Forced Skip") badgeClass = "done";
-                    if(row.status.includes("Missed")) badgeClass = "missed";
+                    if(row.status.includes("Missed") || row.status.includes("Absent")) badgeClass = "missed";
                     
                     return `
                         <tr>
@@ -833,7 +848,13 @@
                 if (!tbody) return;
                 tbody.innerHTML = "";
 
-                for (let u in usersDatabase) {
+                const sortedAdminKeys = Object.keys(usersDatabase).sort((a, b) => {
+                    if (a.toLowerCase() === ADMIN_ID) return -1;
+                    if (b.toLowerCase() === ADMIN_ID) return 1;
+                    return DESIRED_ORDER.indexOf(a) - DESIRED_ORDER.indexOf(b);
+                });
+
+                sortedAdminKeys.forEach(u => {
                     const isAdminRow = (u.toLowerCase() === ADMIN_ID);
                     const currentStatus = usersDatabase[u].status || "present";
                     
@@ -857,18 +878,17 @@
                         </td>
                     `;
                     tbody.appendChild(tr);
-                }
+                });
             }
 
+            // --- 🔒 ADMIN CHANGE REMOVED FROM HISTORY ---
             window.toggleStatusViaAdmin = function(targetUser) {
                 if (targetUser.toLowerCase() === ADMIN_ID) return;
                 const currentStatus = usersDatabase[targetUser].status || "present";
-                const nStatus = (currentStatus === "present") ? "absent" : "present";
+                usersDatabase[targetUser].status = (currentStatus === "present") ? "absent" : "present";
                 
-                usersDatabase[targetUser].status = nStatus;
-                pushUsersDatabase();
-                
-                addLogEntry(getTodayString(), targetUser, nStatus === "absent" ? "Absent via Admin" : "Present via Admin");
+                // Pushes changes quietly to the database without generating a visible history log line
+                pushUsersDatabase(); 
             }
 
             window.triggerEditUser = function(name) {
