@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Duty Management System</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(255, 255, 255, 0.98);
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+            --shadow-premium: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            letter-spacing: -0.01em;
+        }
+
+        body { 
+            background: var(--bg-gradient); 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            padding: 16px;
+        }
+
+        .container { 
+            background: var(--card-bg); 
+            width: 100%; 
+            max-width: 460px; 
+            padding: 32px 24px; 
+            border-radius: var(--radius-lg); 
+            box-shadow: var(--shadow-premium); 
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            margin-bottom: 80px;
+        }
+        
+        .screen { display: none; }
+        .screen.active { display: block; animation: fadeIn 0.4s ease-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 24px; color: #1e1b4b; }
+        h3 { font-size: 1.1rem; font-weight: 700; margin: 20px 0 10px 0; color: #1e1b4b; text-align: left; }
+        
+        .live-date { 
+            font-size: 0.85rem; 
+            font-weight: 700; 
+            color: var(--primary); 
+            margin-bottom: 6px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.08em;
+            text-align: left;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .status-toggle-btn {
+            width: auto;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border-radius: 20px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+        }
+        .status-toggle-btn.present {
+            background: #e6fbf3;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+        }
+        .status-toggle-btn.absent {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .display-system { 
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0; 
+            padding: 32px 16px; 
+            border-radius: var(--radius-md); 
+            margin-bottom: 24px; 
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .display-system.duty-done {
+            background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+            border-color: #bbf7d0;
+        }
+        
+        .current-worker { font-size: 2.1rem; font-weight: 900; color: #1e1b4b; letter-spacing: -0.03em; line-height: 1.2; text-transform: capitalize; }
+        .display-system.duty-done .current-worker { color: #14532d; font-size: 1.8rem; }
+
+        .sub-message { font-size: 1rem; color: var(--text-muted); margin-top: 12px; font-weight: 600; }
+        .display-system.duty-done .sub-message { color: #15803d; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 20px; display: inline-block; margin-top: 14px; border: 1px solid rgba(22,163,74,0.15); text-transform: capitalize; }
+        
+        .penalty-text { color: var(--danger); font-weight: 700; font-size: 0.95rem; margin-top: 12px; line-height: 1.4; padding: 8px; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; }
+
+        input, textarea { 
+            width: 100%; 
+            padding: 14px; 
+            margin-bottom: 12px; 
+            border: 1px solid #cbd5e1; 
+            border-radius: var(--radius-sm); 
+            font-size: 1rem; 
+            font-weight: 500;
+            text-align: center; 
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--primary);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+        .pin-input { font-size: 1.8rem; letter-spacing: 8px; font-weight: 700; }
+
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            font-size: 1rem; 
+            font-weight: 700; 
+            border-radius: var(--radius-sm); 
+            border: none; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+        }
+        button:active { transform: scale(0.98); }
+        
+        .primary-btn { background: var(--primary); color: white; margin-bottom: 12px; }
+        
+        .comp-btn { 
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+            color: white; 
+            font-size: 1.2rem; 
+            padding: 18px; 
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+        .comp-btn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+        
+        .status-msg { margin-top: 12px; font-size: 0.9rem; font-weight: 600; }
+        .status-msg.locked { color: var(--danger); }
+        .status-msg.ready { color: #059669; }
+        
+        .switch-link { color: var(--primary); cursor: pointer; font-weight: 600; font-size: 0.88rem; display: inline-block; margin-top: 5px; }
+
+        .team-list, .notes-board-panel, .report-panel { 
+            font-size: 0.88rem; 
+            color: var(--text-muted); 
+            margin: 15px 0; 
+            text-align: left; 
+            background: #f8fafc; 
+            padding: 14px; 
+            border-radius: var(--radius-sm);
+            border: 1px solid #e2e8f0;
+        }
+
+        .notes-list { margin-bottom: 10px; max-height: 120px; overflow-y: auto; }
+        .note-item { background: #fffdf5; border-left: 3px solid #eab308; padding: 6px 10px; margin-bottom: 6px; border-radius: 4px; font-size: 0.85rem; color: #451a03; word-break: break-all;}
+        .note-meta { font-size: 0.7rem; color: #854d0e; margin-top: 2px; text-align: right;}
+
+        .report-table-wrapper { max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .report-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; background: #fff; }
+        .report-table th { background: #f1f5f9; color: #475569; font-weight: 700; padding: 8px; text-align: left; position: sticky; top: 0; border-bottom: 2px solid #cbd5e1; }
+        .report-table td { padding: 8px; border-bottom: 1px solid #edf2f7; color: #334155; }
+        
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;}
+        .badge.done { background: #dcfce7; color: #15803d; }
+        .badge.missed { background: #fee2e2; color: #b91c1c; }
+        .badge.absent { background: #f1f5f9; color: #64748b; }
+
+        .accent-card { border: 1px solid #edf2f7; padding: 16px; border-radius: var(--radius-sm); margin-bottom: 16px; background: #ffffff; }
+
+        .admin-only-panel { display: none; margin-top: 28px; border-top: 2px dashed #cbd5e1; padding-top: 24px; text-align: left; background: #fffdf5; border-radius: var(--radius-md); padding: 20px; border: 1px solid #fef3c7; }
+        .admin-only-panel.is-admin { display: block; }
+        .test-title { font-size: 0.8rem; font-weight: 800; color: #b45309; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+        .test-btn { background: #d97706; color: white; font-size: 0.9rem; padding: 12px; border-radius: var(--radius-sm); font-weight: 600; margin-bottom: 8px; width: 100%; }
+        
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
+        .admin-table th { background: #fef3c7; color: #b45309; font-weight: 700; text-align: left; padding: 8px; border: 1px solid #fcd34d; }
+        .admin-table td { padding: 8px; border: 1px solid #fcd34d; background: #fff; color: #334155; text-transform: capitalize; }
+        .action-icon-btn { width: auto; padding: 4px 8px; font-size: 0.75rem; display: inline-block; border-radius: 4px; margin-right: 2px; }
+        
+        .admin-status-badge { cursor: pointer; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+        .admin-status-badge:hover { filter: brightness(0.9); }
+
+        /* Floating Download Button Style */
+        .download-float-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            z-index: 999;
+            cursor: pointer;
+            border: 2px solid white;
+            transition: all 0.2s ease;
+        }
+        .download-float-btn:hover {
+            transform: scale(1.1);
+            background: #dc2626;
+        }
+        .download-float-btn:active { transform: scale(0.95); }
+
+        /* --- 📝 HIGH PERFORMANCE PRINT CONFIGURATIONS FOR GENERATING CLEAN PDF --- */
+        #printReportContainer { display: none; }
+        
+        @media print {
+            body { background: #ffffff !important; color: #000000 !important; display: block; padding: 0; }
+            .container, .download-float-btn { display: none !important; }
+            #printReportContainer { display: block !important; padding: 20px; font-family: 'Helvetica', sans-serif; }
+            .print-header { border-bottom: 3px solid #1e1b4b; padding-bottom: 12px; margin-bottom: 24px; text-align: left; }
+            .print-header h1 { font-size: 24px; color: #1e1b4b; text-transform: uppercase; margin-bottom: 4px; }
+            .print-header p { font-size: 12px; color: #475569; font-weight: 600; }
+            .print-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            .print-table th { background: #f1f5f9 !important; color: #0f172a !important; font-weight: 700; border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+            .print-table td { padding: 10px; border: 1px solid #e2e8f0; font-size: 13px; color: #1e293b; text-transform: capitalize; }
+            .print-badge { font-weight: bold; text-transform: uppercase; font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="printReportContainer">
+        <div class="print-header">
+            <h1>Official Room Duty Logs Report</h1>
+            <p id="printGeneratedMeta">Generated Date: ...</p>
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Log Date</th>
+                    <th>Roommate / Worker Name</th>
+                    <th>Shift Status Context</th>
+                </tr>
+            </thead>
+            <tbody id="printTableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="container">
+        
+        <div id="loginScreen" class="screen active">
+            <h2>🔑 Room Duty Login</h2>
+            <input type="text" id="loginName" placeholder="Enter Your Name">
+            <input type="password" id="loginPin" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric">
+            <button class="primary-btn" id="enterBtn">Unlock Dashboard</button>
+            <span class="switch-link" onclick="handleForgotFlow()">Forgot PIN?</span>
+        </div>
+
+        <div id="forgotScreen" class="screen">
+            <h2>🧩 Account Recovery</h2>
+            <input type="text" id="forgotName" placeholder="Your Registered Name" readonly>
+            <p id="recoveryQuestionText" style="font-weight: 700; margin-bottom: 12px; color: #1e1b4b; text-align: left; font-size: 0.95rem;">Question: ...</p>
+            <input type="text" id="recoveryAnswer" placeholder="Answer Here">
+            
+            <div id="newPinSection" style="display: none; border-top: 2px dashed #cbd5e1; margin-top: 15px; padding-top: 15px;">
+                <label style="font-size: 0.85rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px;">Create New Login PIN:</label>
+                <input type="password" id="recoveredNewPin" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric">
+            </div>
+
+            <button class="primary-btn" id="recoverBtn">Verify Answer</button>
+            <span class="switch-link" onclick="exitRecoveryFlow()">Back to Login</span>
+        </div>
+
+        <div id="dashboardScreen" class="screen">
+            <div class="header-container">
+                <div id="dateDisplay" class="live-date">...</div>
+                <button id="userStatusToggle" class="status-toggle-btn present">🟢 Present</button>
+            </div>
+            
+            <h2 id="welcomeUser">Welcome</h2>
+            
+            <div id="displayCard" class="display-system">
+                <div id="workerDisplay" class="current-worker">No Workers Added</div>
+                <div id="subMessageDisplay" class="sub-message"></div>
+                <div id="penaltyDisplay" class="penalty-text"></div>
+            </div>
+
+            <button id="compBtn" class="comp-btn">COMPLETE SHIFT</button>
+            <div id="statusMsg" class="status-msg"></div>
+
+            <div class="team-list" id="lineupSection">
+                <strong style="color: #1e1b4b; display: block; margin-bottom: 4px;">🔄 Current Rotation Lineup:</strong>
+                <div id="orderDisplay" style="font-weight: 600; color: #475569; text-transform: capitalize;">None</div>
+            </div>
+
+            <h3>📌 Important Dashboard Notes</h3>
+            <div class="notes-board-panel">
+                <div class="notes-list" id="notesList">
+                    <div class="note-item" style="background:#f1f5f9; border-color:#94a3b8; text-align:center; color:#64748b">No notice board pins right now.</div>
+                </div>
+                <textarea id="noteInput" rows="2" placeholder="Write a note to broadcast to everyone..." style="text-align:left; font-size:0.85rem; padding:10px; margin-bottom:8px; resize: none;"></textarea>
+                <button class="primary-btn" id="addNoteBtn" style="padding:8px; font-size:0.85rem; margin-bottom:0;">Pin Note to Board</button>
+            </div>
+
+            <h3>📅 System Historical Log Report</h3>
+            <div class="report-panel">
+                <div class="report-table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Worker Name</th>
+                                <th>Slotted Status / Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody">
+                            <tr>
+                                <td colspan="3" style="text-align:center; color:#94a3b8;">No historical rows stored.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="adminPanel" class="admin-only-panel">
+                <div class="test-title">👑 Admin Control Panel</div>
+                
+                <div class="accent-card">
+                    <label id="formActionTitle" style="font-size: 0.8rem; font-weight: 700; color: #b45309; display:block; margin-bottom:6px;">Add New Roommate:</label>
+                    <input type="hidden" id="editOriginalName">
+                    <input type="text" id="newMemberName" placeholder="Roommate Name" style="padding: 10px; text-align: left;">
+                    <input type="password" id="newMemberPin" maxlength="4" placeholder="Assign 4-Digit PIN" style="padding: 10px; text-align: left;">
+                    
+                    <label id="dynamicQuestionLabel" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display:block; margin-bottom:4px; text-align: left;">Date of Birth (DOB):</label>
+                    <input type="text" id="customAdminQuestion" placeholder="Custom Secret Question" style="padding: 10px; text-align: left; display: none;">
+                    <input type="text" id="newMemberAnswer" placeholder="DD/MM/YYYY" style="padding: 10px; text-align: left;">
+                    
+                    <button class="test-btn" id="addMemberBtn" style="background: var(--primary);">Save Profile</button>
+                    <button class="test-btn" id="cancelEditBtn" style="background: var(--text-muted); display: none; margin-top: -4px;">Cancel Editing</button>
+                </div>
+
+                <div class="accent-card" style="overflow-x: auto;">
+                    <label style="font-size: 0.8rem; font-weight: 700; color: #b45309; display:block; margin-bottom:6px;">Manage Registered Members:</label>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                               <th>Roommate</th>
+                               <th>Status</th>
+                               <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody"></tbody>
+                    </table>
+                </div>
+
+                <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
+                <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
+                <button class="test-btn" id="clearAllBtn" style="background: var(--danger); margin-top: 14px;">Wipe All Data & Reset</button>
+            </div>
+
+            <button class="primary-btn" style="background: #64748b; margin-top: 24px; padding: 12px;" id="logOutBtn">Log Out</button>
+        </div>
+
+    </div>
+
+    <div class="download-float-btn" id="downloadCsvBtn" title="Export Log Report to PDF">📄</div>
+
+    <script>
+        (function() {
+            const ADMIN_ID = "admin";
+            let isEditingMode = false;
+            let isAnswerVerified = false;
+
+            let appState = JSON.parse(localStorage.getItem('teamAppState')) || {
+                rotation: [],
+                currentIndex: 0,
+                lastCompletedDate: "",
+                dateStampAssigned: "",
+                lastCompletedWorkerName: ""
+            };
+
+            let usersDatabase = JSON.parse(localStorage.getItem('teamUsersDatabase')) || {};
+            let systemNotes = JSON.parse(localStorage.getItem('teamSystemNotes')) || [];
+            let systemHistoryLogs = JSON.parse(localStorage.getItem('teamSystemHistoryLogs')) || [];
+            
+            if (!usersDatabase["admin"]) {
+                usersDatabase["admin"] = { pin: "1234", question: "What is your secret key?", answer: "surya", status: "present" };
+                localStorage.setItem('teamUsersDatabase', JSON.stringify(usersDatabase));
+            }
+
+            let activeLoggedUser = localStorage.getItem('activeTeamUser') || null;
+
+            function saveToStorage() {
+                localStorage.setItem('teamAppState', JSON.stringify(appState));
+                localStorage.setItem('teamUsersDatabase', JSON.stringify(usersDatabase));
+                localStorage.setItem('teamSystemNotes', JSON.stringify(systemNotes));
+                localStorage.setItem('teamSystemHistoryLogs', JSON.stringify(systemHistoryLogs));
+            }
+
+            window.showScreen = function(screenId) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(screenId).classList.add('active');
+                
+                const dlBtn = document.getElementById('downloadCsvBtn');
+                if (screenId === 'dashboardScreen') {
+                    dlBtn.style.display = "flex";
+                } else {
+                    dlBtn.style.display = "none";
+                }
+            }
+
+            function maskAsDateFormat(e) {
+                const targetUser = document.getElementById('forgotName').value || "";
+                if (targetUser.toLowerCase() === ADMIN_ID) return;
+                
+                let v = e.target.value.replace(/\D/g, '');
+                if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+                if (v.length > 5) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+                e.target.value = v;
+            }
+
+            document.getElementById('newMemberAnswer').addEventListener('input', (e) => {
+                if (!isEditingMode || document.getElementById('editOriginalName').value.toLowerCase() !== ADMIN_ID) {
+                    maskAsDateFormat(e);
+                }
+            });
+            document.getElementById('recoveryAnswer').addEventListener('input', maskAsDateFormat);
+
+            window.handleForgotFlow = function() {
+                const nameInput = document.getElementById('loginName').value.trim();
+                if(!nameInput) return alert("Please type your name in the login box first.");
+                
+                const registeredName = Object.keys(usersDatabase).find(u => u.toLowerCase() === nameInput.toLowerCase());
+                if(!registeredName) return alert("User name not found.");
+
+                document.getElementById('forgotName').value = registeredName;
+                
+                if (registeredName.toLowerCase() === ADMIN_ID) {
+                    document.getElementById('recoveryQuestionText').innerText = `Question: ${usersDatabase[registeredName].question}`;
+                    document.getElementById('recoveryAnswer').placeholder = "Enter secret answer";
+                } else {
+                    document.getElementById('recoveryQuestionText').innerText = "Question: What is your DOB?";
+                    document.getElementById('recoveryAnswer').placeholder = "DD/MM/YYYY";
+                }
+                showScreen('forgotScreen');
+            }
+
+            window.exitRecoveryFlow = function() {
+                isAnswerVerified = false;
+                document.getElementById('newPinSection').style.display = "none";
+                document.getElementById('recoveryAnswer').disabled = false;
+                document.getElementById('recoveryAnswer').value = "";
+                document.getElementById('recoveredNewPin').value = "";
+                document.getElementById('recoverBtn').innerText = "Verify Answer";
+                showScreen('loginScreen');
+            }
+
+            document.getElementById('enterBtn').addEventListener('click', () => {
+                const nameInput = document.getElementById('loginName').value.trim();
+                const pinInput = document.getElementById('loginPin').value;
+
+                const registeredName = Object.keys(usersDatabase).find(u => u.toLowerCase() === nameInput.toLowerCase());
+                if (registeredName && usersDatabase[registeredName].pin === pinInput) {
+                    activeLoggedUser = registeredName;
+                    localStorage.setItem('activeTeamUser', registeredName);
+                    setupDashboard(registeredName);
+                } else {
+                    alert("Access Denied! Invalid credentials.");
+                }
+            });
+
+            document.getElementById('recoverBtn').addEventListener('click', () => {
+                const name = document.getElementById('forgotName').value;
+                
+                if (!isAnswerVerified) {
+                    const ansInput = document.getElementById('recoveryAnswer').value.trim();
+                    if(ansInput.toLowerCase() === usersDatabase[name].answer.toLowerCase()) {
+                        isAnswerVerified = true;
+                        document.getElementById('newPinSection').style.display = "block";
+                        document.getElementById('recoveryAnswer').disabled = true;
+                        document.getElementById('recoverBtn').innerText = "Update PIN";
+                    } else {
+                        alert("Incorrect answer provided.");
+                    }
+                } else {
+                    const targetNewPin = document.getElementById('recoveredNewPin').value;
+                    if (targetNewPin.length !== 4 || isNaN(targetNewPin)) {
+                        return alert("New PIN must be a 4-digit number.");
+                    }
+                    usersDatabase[name].pin = targetNewPin;
+                    saveToStorage();
+                    alert("🎉 PIN updated successfully!");
+                    exitRecoveryFlow();
+                }
+            });
+
+            document.getElementById('logOutBtn').addEventListener('click', () => {
+                localStorage.removeItem('activeTeamUser');
+                activeLoggedUser = null;
+                showScreen('loginScreen');
+            });
+
+            function getTodayString() {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+
+            function setupDashboard(username) {
+                showScreen('dashboardScreen');
+                const isUserAdmin = (username.toLowerCase() === ADMIN_ID);
+                document.getElementById('welcomeUser').innerText = `Hello, ${username}! ${isUserAdmin ? '👑' : ''}`;
+                
+                const now = new Date();
+                document.getElementById('dateDisplay').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                
+                if (!appState.dateStampAssigned) {
+                    appState.dateStampAssigned = getTodayString();
+                    saveToStorage();
+                }
+
+                if (isUserAdmin) {
+                    document.getElementById('adminPanel').classList.add('is-admin');
+                    document.getElementById('lineupSection').style.display = "block";
+                    document.getElementById('userStatusToggle').style.display = "none";
+                    buildUserManagementTable();
+                } else {
+                    document.getElementById('adminPanel').classList.remove('is-admin');
+                    document.getElementById('userStatusToggle').style.display = "block";
+                    updateToggleButtonUI();
+                }
+                renderUI();
+                renderNotes();
+                renderReportTable();
+                checkAndLogRollovers();
+            }
+
+            function updateToggleButtonUI() {
+                const btn = document.getElementById('userStatusToggle');
+                const currentStatus = usersDatabase[activeLoggedUser].status || "present";
+                if(currentStatus === "present") {
+                    btn.innerText = "🟢 Present";
+                    btn.className = "status-toggle-btn present";
+                } else {
+                    btn.innerText = "🔴 Absent";
+                    btn.className = "status-toggle-btn absent";
+                }
+            }
+
+            document.getElementById('userStatusToggle').addEventListener('click', () => {
+                const currentStatus = usersDatabase[activeLoggedUser].status || "present";
+                const newStatus = (currentStatus === "present") ? "absent" : "present";
+                
+                usersDatabase[activeLoggedUser].status = newStatus;
+                
+                if (newStatus === "absent") {
+                    addLogEntry(getTodayString(), activeLoggedUser, "Marked Absent");
+                } else {
+                    addLogEntry(getTodayString(), activeLoggedUser, "Returned Present");
+                }
+
+                saveToStorage();
+                updateToggleButtonUI();
+                renderUI();
+                renderReportTable();
+            });
+
+            function syncRotationList() {
+                appState.rotation = Object.keys(usersDatabase).filter(u => {
+                    return u.toLowerCase() !== ADMIN_ID && (usersDatabase[u].status !== "absent");
+                });
+                saveToStorage();
+            }
+
+            function checkAndLogRollovers() {
+                const todayStr = getTodayString();
+                if (appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr && appState.lastCompletedDate !== appState.dateStampAssigned) {
+                    const missingWorker = appState.rotation[appState.currentIndex];
+                    addLogEntry(appState.dateStampAssigned, missingWorker, "Missed Shift (Rollover)");
+                    renderReportTable();
+                }
+            }
+
+            function addLogEntry(date, name, statusText) {
+                const exists = systemHistoryLogs.some(log => log.date === date && log.name === name && log.status === statusText);
+                if (!exists) {
+                    systemHistoryLogs.unshift({ date, name, status: statusText });
+                    saveToStorage();
+                }
+            }
+
+            function renderUI() {
+                syncRotationList();
+
+                const todayStr = getTodayString();
+                const displayCard = document.getElementById('displayCard');
+                const workerDisplay = document.getElementById('workerDisplay');
+                const subMessageDisplay = document.getElementById('subMessageDisplay');
+                const penaltyDisplay = document.getElementById('penaltyDisplay');
+                const compBtn = document.getElementById('compBtn');
+                const statusMsg = document.getElementById('statusMsg');
+
+                if (appState.rotation.length === 0) {
+                    workerDisplay.innerText = "Lineup Empty";
+                    subMessageDisplay.innerText = "Everyone is absent or no workers exist.";
+                    penaltyDisplay.style.display = "none";
+                    compBtn.disabled = true;
+                    compBtn.innerText = "LOCKED";
+                    statusMsg.innerText = "";
+                    document.getElementById('orderDisplay').innerText = "None";
+                    return;
+                }
+                
+                if (appState.currentIndex >= appState.rotation.length) {
+                    appState.currentIndex = 0;
+                }
+
+                const currentWorkerName = appState.rotation[appState.currentIndex];
+                const isMyTurn = (activeLoggedUser && activeLoggedUser.toLowerCase() === currentWorkerName.toLowerCase());
+
+                document.getElementById('orderDisplay').innerText = appState.rotation.join(" → ");
+
+                if (appState.lastCompletedDate === todayStr) {
+                    displayCard.className = "display-system duty-done";
+                    workerDisplay.innerHTML = `🎉 ${appState.lastCompletedWorkerName} Completed Work!`;
+                    subMessageDisplay.innerHTML = `👉 Tomorrow: <strong>${currentWorkerName}'s</strong> Work.`;
+                    penaltyDisplay.style.display = "none";
+                    
+                    compBtn.disabled = true;
+                    compBtn.innerText = "COMPLETED TODAY";
+                    statusMsg.className = "status-msg locked";
+                    statusMsg.innerText = "🔒 Shift locked until tomorrow.";
+                } else {
+                    displayCard.className = "display-system";
+                    penaltyDisplay.style.display = "block";
+
+                    if (isMyTurn) {
+                        workerDisplay.innerText = "Your Turn Today!";
+                        
+                        if (appState.dateStampAssigned !== todayStr) {
+                            subMessageDisplay.innerText = "⚠️ Shift Obligation Active";
+                            penaltyDisplay.innerText = "🚨 You did not click COMPLETE yesterday! You must do the work again today.";
+                        } else {
+                            subMessageDisplay.innerText = "📋 Complete your shift work.";
+                            penaltyDisplay.style.display = "none";
+                        }
+
+                        compBtn.disabled = false;
+                        compBtn.innerText = "COMPLETE SHIFT";
+                        statusMsg.className = "status-msg ready";
+                        statusMsg.innerText = "✅ Click above once your work is done.";
+                    } else {
+                        workerDisplay.innerText = `${currentWorkerName}'s Turn Today`;
+                        subMessageDisplay.innerText = "🔮 Next user lineup waiting inside rotation.";
+                        
+                        if (appState.dateStampAssigned !== todayStr) {
+                            penaltyDisplay.innerText = `⚠️ ${currentWorkerName} missed yesterday's completion and is on a rollover penalty today.`;
+                        } else {
+                            penaltyDisplay.style.display = "none";
+                        }
+
+                        compBtn.disabled = true;
+                        compBtn.innerText = "LOCKED";
+                        statusMsg.className = "status-msg locked";
+                        statusMsg.innerText = (activeLoggedUser && activeLoggedUser.toLowerCase() === ADMIN_ID) ? 
+                            "👑 Viewing dashboard panel context as Admin." : 
+                            `❌ Only ${currentWorkerName} can click complete today.`;
+                    }
+                }
+            }
+
+            document.getElementById('compBtn').addEventListener('click', () => {
+                const todayStr = getTodayString();
+                appState.lastCompletedWorkerName = appState.rotation[appState.currentIndex];
+                
+                addLogEntry(todayStr, appState.lastCompletedWorkerName, "Duty Done");
+                
+                appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
+                appState.lastCompletedDate = todayStr;
+                appState.dateStampAssigned = todayStr;
+                
+                saveToStorage();
+                renderUI();
+                renderReportTable();
+            });
+
+            document.getElementById('addNoteBtn').addEventListener('click', () => {
+                const text = document.getElementById('noteInput').value.trim();
+                if (!text) return alert("Please enter some note content first!");
+                
+                const timestamp = new Date().toLocaleString();
+                systemNotes.unshift({
+                    user: activeLoggedUser || "Unknown User",
+                    text: text,
+                    time: timestamp
+                });
+                
+                document.getElementById('noteInput').value = "";
+                saveToStorage();
+                renderNotes();
+            });
+
+            function renderNotes() {
+                const notesList = document.getElementById('notesList');
+                if (systemNotes.length === 0) {
+                    notesList.innerHTML = `<div class="note-item" style="background:#f1f5f9; border-color:#94a3b8; text-align:center; color:#64748b">No notice board pins right now.</div>`;
+                    return;
+                }
+                notesList.innerHTML = systemNotes.map(n => `
+                    <div class="note-item">
+                        <div><strong>${n.user}:</strong> ${n.text}</div>
+                        <div class="note-meta">${n.time}</div>
+                    </div>
+                `).join('');
+            }
+
+            function renderReportTable() {
+                const tbody = document.getElementById('reportTableBody');
+                if (systemHistoryLogs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">No historical rows stored.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = systemHistoryLogs.map(row => {
+                    let badgeClass = "absent";
+                    if(row.status === "Duty Done" || row.status === "Forced Skip") badgeClass = "done";
+                    if(row.status.includes("Missed")) badgeClass = "missed";
+                    
+                    return `
+                        <tr>
+                            <td><strong>${row.date}</strong></td>
+                            <td style="text-transform: capitalize;">${row.name}</td>
+                            <td><span class="badge ${badgeClass}">${row.status}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // --- 🖨️ TRIGGER PDF GENERATION FLOW ---
+            document.getElementById('downloadCsvBtn').addEventListener('click', () => {
+                if(systemHistoryLogs.length === 0) return alert("No tracking rows found to compile into a PDF document.");
+                
+                // Populate print container workspace before triggering layout capture
+                document.getElementById('printGeneratedMeta').innerText = `Generated on: ${new Date().toLocaleString()}`;
+                
+                const printBody = document.getElementById('printTableBody');
+                printBody.innerHTML = systemHistoryLogs.map(row => `
+                    <tr>
+                        <td>${row.date}</td>
+                        <td>${row.name}</td>
+                        <td><span class="print-badge">${row.status}</span></td>
+                    </tr>
+                `).join('');
+                
+                // Execute native print rendering engine to capture the standalone CSS page setup
+                window.print();
+            });
+
+            document.getElementById('addMemberBtn').addEventListener('click', () => {
+                const name = document.getElementById('newMemberName').value.trim();
+                const pin = document.getElementById('newMemberPin').value;
+                let ans = document.getElementById('newMemberAnswer').value.trim();
+                let customQ = document.getElementById('customAdminQuestion').value.trim();
+
+                if (isEditingMode && document.getElementById('editOriginalName').value.toLowerCase() === ADMIN_ID) {
+                    if (!pin || !customQ || !ans) return alert("All fields must be filled completely!");
+                } else {
+                    if (!name || pin.length !== 4 || ans.length !== 10) {
+                        return alert("All fields must be filled completely! Format must be DD/MM/YYYY!");
+                    }
+                }
+
+                if (isEditingMode) {
+                    const originalName = document.getElementById('editOriginalName').value;
+                    if (originalName !== name && usersDatabase[name]) return alert("This member name already exists!");
+                    
+                    const savedStatus = usersDatabase[originalName].status || "present";
+                    if(originalName !== name) delete usersDatabase[originalName];
+                    
+                    if (originalName.toLowerCase() === ADMIN_ID) {
+                        usersDatabase[name] = { pin, question: customQ, answer: ans, status: savedStatus };
+                    } else {
+                        usersDatabase[name] = { pin, answer: ans, status: savedStatus };
+                    }
+                    
+                    alert("Profile updated successfully!");
+                    exitEditingState();
+                } else {
+                    if (name.toLowerCase() === ADMIN_ID) return alert("The system name 'admin' is structurally reserved!");
+                    if (usersDatabase[name]) return alert("This member name already exists!");
+                    usersDatabase[name] = { pin, answer: ans, status: "present" };
+                    alert(`${name} successfully added!`);
+                }
+                
+                saveToStorage();
+                renderUI();
+                buildUserManagementTable();
+                clearFormInputs();
+            });
+
+            function buildUserManagementTable() {
+                const tbody = document.getElementById('adminTableBody');
+                tbody.innerHTML = "";
+
+                for (let u in usersDatabase) {
+                    const isAdminRow = (u.toLowerCase() === ADMIN_ID);
+                    const currentStatus = usersDatabase[u].status || "present";
+                    
+                    let statusLabel = currentStatus === "present" ? "🟢 Present" : "🔴 Absent";
+                    let bgBadgeColor = currentStatus === "present" ? "#e6fbf3" : "#fef2f2";
+                    let textBadgeColor = currentStatus === "present" ? "#059669" : "#dc2626";
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${u} ${isAdminRow ? '👑' : ''}</strong></td>
+                        <td>
+                            ${isAdminRow ? '<code>—</code>' : `
+                                <span class="admin-status-badge" style="background: ${bgBadgeColor}; color: ${textBadgeColor};" onclick="toggleStatusViaAdmin('${u}')">
+                                    ${statusLabel}
+                                </span>
+                            `}
+                        </td>
+                        <td>
+                            <button class="action-icon-btn" style="background:#3b82f6; color:#fff;" onclick="triggerEditUser('${u}')">✏️</button>
+                            <button class="action-icon-btn" style="background:#ef4444; color:#fff;" onclick="triggerDeleteUser('${u}')" ${isAdminRow ? 'disabled style="background:#cbd5e1"' : ''}>❌</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            }
+
+            window.toggleStatusViaAdmin = function(targetUser) {
+                if (targetUser.toLowerCase() === ADMIN_ID) return;
+                
+                const currentStatus = usersDatabase[targetUser].status || "present";
+                const nStatus = (currentStatus === "present") ? "absent" : "present";
+                usersDatabase[targetUser].status = nStatus;
+                
+                addLogEntry(getTodayString(), targetUser, nStatus === "absent" ? "Absent via Admin" : "Present via Admin");
+                
+                saveToStorage();
+                buildUserManagementTable();
+                renderUI();
+                renderReportTable();
+            }
+
+            window.triggerEditUser = function(name) {
+                isEditingMode = true;
+                const user = usersDatabase[name];
+                
+                document.getElementById('formActionTitle').innerText = `Editing Profile: ${name}`;
+                document.getElementById('editOriginalName').value = name;
+                document.getElementById('newMemberName').value = name;
+                
+                if(name.toLowerCase() === ADMIN_ID) {
+                    document.getElementById('newMemberName').disabled = true;
+                    document.getElementById('dynamicQuestionLabel').innerText = "Recovery Security Question:";
+                    document.getElementById('customAdminQuestion').style.display = "block";
+                    document.getElementById('customAdminQuestion').value = user.question || "";
+                    document.getElementById('newMemberAnswer').placeholder = "Enter custom answer text";
+                } else {
+                    document.getElementById('newMemberName').disabled = false;
+                    document.getElementById('dynamicQuestionLabel').innerText = "Date of Birth (DOB):";
+                    document.getElementById('customAdminQuestion').style.display = "none";
+                    document.getElementById('newMemberAnswer').placeholder = "DD/MM/YYYY";
+                }
+                
+                document.getElementById('newMemberPin').value = user.pin;
+                document.getElementById('newMemberAnswer').value = user.answer;
+                document.getElementById('cancelEditBtn').style.display = "block";
+                document.getElementById('newMemberPin').focus();
+            }
+
+            window.triggerDeleteUser = function(name) {
+                if(name.toLowerCase() === ADMIN_ID) return alert("Admin profiles cannot be wiped!");
+                if(confirm(`Are you sure you want to remove ${name}?`)) {
+                    delete usersDatabase[name];
+                    syncRotationList();
+                    if (appState.currentIndex >= appState.rotation.length) appState.currentIndex = 0;
+                    
+                    saveToStorage();
+                    renderUI();
+                    buildUserManagementTable();
+                }
+            }
+
+            function exitEditingState() {
+                isEditingMode = false;
+                document.getElementById('formActionTitle').innerText = "Add New Roommate:";
+                document.getElementById('cancelEditBtn').style.display = "none";
+                document.getElementById('newMemberName').disabled = false;
+                document.getElementById('dynamicQuestionLabel').innerText = "Date of Birth (DOB):";
+                document.getElementById('customAdminQuestion').style.display = "none";
+                document.getElementById('newMemberAnswer').placeholder = "DD/MM/YYYY";
+                clearFormInputs();
+            }
+
+            function clearFormInputs() {
+                document.getElementById('editOriginalName').value = "";
+                document.getElementById('newMemberName').value = "";
+                document.getElementById('newMemberPin').value = "";
+                document.getElementById('customAdminQuestion').value = "";
+                document.getElementById('newMemberAnswer').value = "";
+            }
+
+            document.getElementById('cancelEditBtn').addEventListener('click', exitEditingState);
+
+            document.getElementById('forceSkipBtn').addEventListener('click', () => {
+                if (appState.rotation.length === 0) return;
+                const skippedWorker = appState.rotation[appState.currentIndex];
+                
+                addLogEntry(getTodayString(), skippedWorker, "Forced Skip");
+                
+                appState.lastCompletedWorkerName = skippedWorker;
+                appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
+                appState.dateStampAssigned = getTodayString();
+                
+                saveToStorage();
+                renderUI();
+                renderReportTable();
+            });
+
+            document.getElementById('resetLockBtn').addEventListener('click', () => {
+                appState.lastCompletedDate = "";
+                saveToStorage();
+                renderUI();
+                alert("Date lock cleared!");
+            });
+
+            document.getElementById('clearAllBtn').addEventListener('click', () => {
+                if (confirm("Reset everything? This deletes all users except the master Admin configuration settings.")) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            });
+
+            if (activeLoggedUser && usersDatabase[activeLoggedUser]) {
+                setupDashboard(activeLoggedUser);
+            } else {
+                showScreen('loginScreen');
+            }
+        })();
+    </script>
+</body>
+</html>
