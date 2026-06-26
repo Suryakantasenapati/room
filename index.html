@@ -453,10 +453,16 @@
                 renderUI();
             });
 
+            // Listen directly for data updates to system notes
             db.ref('room_duty/systemNotes').on('value', (snapshot) => {
                 systemNotes = [];
                 if (snapshot.exists()) {
-                    snapshot.forEach((child) => { systemNotes.unshift(child.val()); });
+                    // Firebase keys sorted oldest to newest, so we keep array ordered correctly
+                    snapshot.forEach((child) => {
+                        let noteObj = child.val();
+                        noteObj.key = child.key; // preserve child hash reference
+                        systemNotes.push(noteObj);
+                    });
                 }
                 renderNotes();
             });
@@ -631,22 +637,32 @@
                 });
                 
                 if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
+                    const workerUpNext = appState.rotation[appState.currentIndex];
+                    
                     appState.rotation = updatedRotation;
+                    
+                    if (workerUpNext) {
+                        const preciseIndex = updatedRotation.indexOf(workerUpNext);
+                        if (preciseIndex !== -1) {
+                            appState.currentIndex = preciseIndex;
+                        } else if (appState.currentIndex >= updatedRotation.length) {
+                            appState.currentIndex = 0;
+                        }
+                    } else {
+                        appState.currentIndex = 0;
+                    }
+                    
                     pushAppState();
                 }
             }
 
-            // --- Fixed Unique Rollover Log Engine ---
             function checkAndLogRollovers() {
                 const todayStr = getTodayString();
                 
-                // Triggered only if the system calendar day rolls over onto a new distinct date
                 if (appState.rotation && appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr) {
-                    
                     if (appState.lastCompletedDate !== appState.dateStampAssigned) {
                         const missingWorker = appState.rotation[appState.currentIndex];
                         
-                        // Strict Verification: scan current memory index to block duplicates
                         const alreadyLogged = systemHistoryLogs.some(log => 
                             log.date === appState.dateStampAssigned && 
                             log.name === missingWorker && 
@@ -658,7 +674,6 @@
                         }
                     }
                     
-                    // Immediately lock down the state stamp context to match today's tracking date
                     appState.dateStampAssigned = todayStr;
                     pushAppState();
                 }
@@ -760,16 +775,26 @@
                 pushAppState();
             });
 
+            // --- Note Board Control: Auto-caps at exactly 3 latest entries ---
             document.getElementById('addNoteBtn').addEventListener('click', () => {
                 const text = document.getElementById('noteInput').value.trim();
                 if (!text) return alert("Please enter some note content first!");
                 
                 const timestamp = new Date().toLocaleString();
+                
+                // If there are already 3 or more notes, automatically delete the oldest one first
+                if (systemNotes.length >= 3) {
+                    const oldestNoteKey = systemNotes[0].key; // The first item is the oldest in our loaded array
+                    db.ref('room_duty/systemNotes/' + oldestNoteKey).remove();
+                }
+                
+                // Add the new note announcement to Firebase
                 db.ref('room_duty/systemNotes').push({
                     user: activeLoggedUser || "Unknown User",
                     text: text,
                     time: timestamp
                 });
+                
                 document.getElementById('noteInput').value = "";
             });
 
@@ -779,7 +804,11 @@
                     notesList.innerHTML = `<div class="note-item" style="background:#f1f5f9; border-left:3px solid #cbd5e1; text-align:center; color:#64748b">No notice board pins right now.</div>`;
                     return;
                 }
-                notesList.innerHTML = systemNotes.map(n => `
+                
+                // Reverse the array clone here so the newest pins show up at the top visually
+                const visualNotes = [...systemNotes].reverse();
+                
+                notesList.innerHTML = visualNotes.map(n => `
                     <div class="note-item">
                         <div><strong>${n.user}:</strong> ${n.text}</div>
                         <div class="note-meta">${n.time}</div>
