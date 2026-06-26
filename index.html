@@ -138,7 +138,7 @@
 
         .penalty-text { color: var(--danger); font-weight: 700; font-size: 0.95rem; margin-top: 12px; line-height: 1.4; padding: 8px; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; }
 
-        input, textarea { 
+        input, textarea, select { 
             width: 100%; 
             padding: 14px; 
             margin-bottom: 12px; 
@@ -151,7 +151,7 @@
             transition: all 0.2s ease;
             outline: none;
         }
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             border-color: var(--primary);
             background: #ffffff;
             box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
@@ -250,11 +250,49 @@
         .download-float-btn:hover { transform: scale(1.1); background: #dc2626; }
         .download-float-btn:active { transform: scale(0.95); }
 
+        /* Premium Overlay Components */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: var(--radius-md);
+            max-width: 360px;
+            width: 100%;
+            box-shadow: var(--shadow-premium);
+            text-align: left;
+        }
+        .modal-card label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #1e1b4b;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .select-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
         #printReportContainer { display: none; }
         
         @media print {
             body { background: #ffffff !important; color: #000000 !important; display: block; padding: 0; }
-            .container, .download-float-btn { display: none !important; }
+            .container, .download-float-btn, .modal-overlay { display: none !important; }
             #printReportContainer { display: block !important; padding: 20px; font-family: 'Helvetica', sans-serif; }
             .print-header { border-bottom: 3px solid #1e1b4b; padding-bottom: 12px; margin-bottom: 24px; text-align: left; }
             .print-header h1 { font-size: 24px; color: #1e1b4b; text-transform: uppercase; margin-bottom: 4px; }
@@ -283,6 +321,46 @@
             </thead>
             <tbody id="printTableBody"></tbody>
         </table>
+    </div>
+
+    <!-- Download/Print Configuration Modal Filter -->
+    <div id="filterModal" class="modal-overlay">
+        <div class="modal-card">
+            <h2 style="font-size:1.2rem; margin-bottom:16px;">📄 Export Parameters</h2>
+            
+            <label>Filter Configuration Scope:</label>
+            <select id="filterScope" class="select-input">
+                <option value="all">Export Entire History Logs</option>
+                <option value="date">Select Specific Date</option>
+                <option value="month">Select Specific Month</option>
+                <option value="year">Select Specific Year</option>
+            </select>
+
+            <div id="scopeInputContainer"></div>
+
+            <button class="primary-btn" id="confirmPrintBtn" style="margin-bottom:8px;">Compile Document</button>
+            <button class="primary-btn" id="closeFilterModalBtn" style="background:#64748b; margin-bottom:0;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Targeted Purge Filter Configuration Modal -->
+    <div id="purgeModal" class="modal-overlay">
+        <div class="modal-card" style="border: 1px solid #fecaca;">
+            <h2 style="font-size:1.2rem; margin-bottom:16px; color:var(--danger)">⚠️ Selective Log Purge Panel</h2>
+            
+            <label>What data type do you want to clear permanently?</label>
+            <select id="purgeScope" class="select-input">
+                <option value="all">Wipe Entire History Logs</option>
+                <option value="roommate">Clear Specific Roommate's Logs Only</option>
+                <option value="missed">Clear "Missed Shift" Logs Only</option>
+                <option value="done">Clear "Duty Done" Logs Only</option>
+            </select>
+
+            <div id="purgeScopeInputContainer" style="margin-bottom:12px;"></div>
+
+            <button class="primary-btn" id="confirmPurgeBtn" style="background:var(--danger); margin-bottom:8px;">Permanently Delete</button>
+            <button class="primary-btn" id="closePurgeModalBtn" style="background:#64748b; margin-bottom:0;">Cancel</button>
+        </div>
     </div>
 
     <div class="container">
@@ -394,7 +472,8 @@
 
                 <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
                 <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
-                <button class="test-btn" id="clearAllBtn" style="background: var(--danger); margin-top: 14px;">Wipe All Data & Reset</button>
+                <!-- 🛠️ Replaced image_27c0dc.png button perfectly with smart selective filter panel -->
+                <button class="test-btn" id="clearLogsBtn" style="background: var(--danger); margin-top: 14px;">Clear History Logs Only</button>
             </div>
 
             <button class="primary-btn" style="background: #64748b; margin-top: 24px; padding: 12px;" id="logOutBtn">Log Out</button>
@@ -432,8 +511,6 @@
             db.ref('room_duty/appState').on('value', (snapshot) => {
                 if (snapshot.exists()) {
                     const incomingState = snapshot.val();
-                    
-                    // Permanent 10x protection: lock sequence index directly to Swaraj on June 27, 2026
                     const d = new Date();
                     const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                     
@@ -487,7 +564,7 @@
                 if (snapshot.exists()) {
                     snapshot.forEach((child) => { 
                         let row = child.val();
-                        // Filter out old forced skips from layout completely
+                        row.key = child.key; // store key hash reference for individual targeted deletions
                         if (row.status !== "Forced Skip") {
                             systemHistoryLogs.unshift(row); 
                         }
@@ -608,12 +685,8 @@
                 const now = new Date();
                 document.getElementById('dateDisplay').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                 
-                const todayStr = getTodayString();
-                if (appState.dateStampAssigned && appState.dateStampAssigned !== todayStr) {
-                    appState.dateStampAssigned = todayStr;
-                    pushAppState();
-                } else if (!appState.dateStampAssigned) {
-                    appState.dateStampAssigned = todayStr;
+                if (!appState.dateStampAssigned) {
+                    appState.dateStampAssigned = getTodayString();
                     pushAppState();
                 }
 
@@ -741,7 +814,6 @@
                     displayCard.className = "display-system duty-done";
                     workerDisplay.innerHTML = `🎉 ${appState.lastCompletedWorkerName} Completed Work!`;
                     
-                    // Predict next slot safely
                     const nextIdx = (appState.currentIndex) % appState.rotation.length;
                     const nextWorker = appState.rotation[nextIdx] || "None";
                     subMessageDisplay.innerHTML = `<div class="tomorrow-badge">👉 Tomorrow: ${nextWorker}'s Work.</div>`;
@@ -850,12 +922,73 @@
                 }).join('');
             }
 
+            // --- Premium Modal Component Filter Control ---
+            const filterModal = document.getElementById('filterModal');
+            const filterScope = document.getElementById('filterScope');
+            const scopeInputContainer = document.getElementById('scopeInputContainer');
+
             document.getElementById('downloadCsvBtn').addEventListener('click', () => {
-                if(systemHistoryLogs.length === 0) return alert("No tracking rows found to compile into a PDF document.");
+                if(systemHistoryLogs.length === 0) return alert("No tracking records found to compile into a PDF document.");
+                filterScope.value = "all";
+                scopeInputContainer.innerHTML = "";
+                filterModal.style.display = "flex";
+            });
+
+            document.getElementById('closeFilterModalBtn').addEventListener('click', () => {
+                filterModal.style.display = "none";
+            });
+
+            filterScope.addEventListener('change', (e) => {
+                const scope = e.target.value;
+                scopeInputContainer.innerHTML = "";
+                
+                if (scope === "date") {
+                    scopeInputContainer.innerHTML = `<input type="date" id="targetFilterDate" style="margin-bottom:12px;">`;
+                } else if (scope === "month") {
+                    scopeInputContainer.innerHTML = `
+                        <select id="targetFilterMonth" class="select-input">
+                            <option value="01">January</option><option value="02">February</option>
+                            <option value="03">March</option><option value="04">April</option>
+                            <option value="05">May</option><option value="06">June</option>
+                            <option value="07">July</option><option value="08">August</option>
+                            <option value="09">September</option><option value="10">October</option>
+                            <option value="11">November</option><option value="12">December</option>
+                        </select>
+                        <input type="number" id="targetFilterMonthYear" value="${new Date().getFullYear()}" placeholder="Year" style="padding:10px;">
+                    `;
+                } else if (scope === "year") {
+                    scopeInputContainer.innerHTML = `<input type="number" id="targetFilterYear" value="${new Date().getFullYear()}" placeholder="Year" style="padding:10px;">`;
+                }
+            });
+
+            document.getElementById('confirmPrintBtn').addEventListener('click', () => {
+                const scope = filterScope.value;
+                let filteredLogs = [...systemHistoryLogs];
+
+                if (scope === "date") {
+                    const rawDate = document.getElementById('targetFilterDate').value; 
+                    if (!rawDate) return alert("Please specify a targeted calendar date.");
+                    filteredLogs = systemHistoryLogs.filter(log => log.date === rawDate);
+                } else if (scope === "month") {
+                    const targetMonth = document.getElementById('targetFilterMonth').value;
+                    const targetYear = document.getElementById('targetFilterMonthYear').value.trim();
+                    if (!targetYear) return alert("Please specify a targeted filter year.");
+                    const prefixMatch = `${targetYear}-${targetMonth}`; 
+                    filteredLogs = systemHistoryLogs.filter(log => log.date.startsWith(prefixMatch));
+                } else if (scope === "year") {
+                    const targetYear = document.getElementById('targetFilterYear').value.trim();
+                    if (!targetYear) return alert("Please specify a targeted filter year.");
+                    filteredLogs = systemHistoryLogs.filter(log => log.date.startsWith(targetYear));
+                }
+
+                if (filteredLogs.length === 0) {
+                    return alert("No log records match your parameters.");
+                }
+
                 document.getElementById('printGeneratedMeta').innerText = `Generated on: ${new Date().toLocaleString()}`;
                 
                 const printBody = document.getElementById('printTableBody');
-                printBody.innerHTML = systemHistoryLogs.map(row => `
+                printBody.innerHTML = filteredLogs.map(row => `
                     <tr>
                         <td>${row.date}</td>
                         <td>${row.name}</td>
@@ -863,7 +996,90 @@
                     </tr>
                 `).join('');
                 
+                filterModal.style.display = "none";
                 window.print();
+            });
+
+            // --- Advanced Admin Selective Purge Control Panel Engine ---
+            const purgeModal = document.getElementById('purgeModal');
+            const purgeScope = document.getElementById('purgeScope');
+            const purgeScopeInputContainer = document.getElementById('purgeScopeInputContainer');
+
+            document.getElementById('clearLogsBtn').addEventListener('click', () => {
+                purgeScope.value = "all";
+                purgeScopeInputContainer.innerHTML = "";
+                purgeModal.style.display = "flex";
+            });
+
+            document.getElementById('closePurgeModalBtn').addEventListener('click', () => {
+                purgeModal.style.display = "none";
+            });
+
+            purgeScope.addEventListener('change', (e) => {
+                const scope = e.target.value;
+                purgeScopeInputContainer.innerHTML = "";
+                
+                if (scope === "roommate") {
+                    // Populate present roommate dropdown list dynamically
+                    const roommates = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID);
+                    let options = roommates.map(r => `<option value="${r}">${r}</option>`).join('');
+                    purgeScopeInputContainer.innerHTML = `
+                        <label>Select Target Roommate:</label>
+                        <select id="targetPurgeRoommate" class="select-input">${options}</select>
+                    `;
+                }
+            });
+
+            document.getElementById('confirmPurgeBtn').addEventListener('click', () => {
+                const scope = purgeScope.value;
+                
+                // Read fresh un-reversed snapshot straight from DB schema map context
+                db.ref('room_duty/systemHistoryLogs').once('value', (snapshot) => {
+                    if (!snapshot.exists()) {
+                        alert("The logs branch is already completely empty.");
+                        purgeModal.style.display = "none";
+                        return;
+                    }
+
+                    let targetsToDelete = [];
+                    
+                    snapshot.forEach((child) => {
+                        const logData = child.val();
+                        const logKey = child.key;
+
+                        if (scope === "all") {
+                            targetsToDelete.push(logKey);
+                        } else if (scope === "roommate") {
+                            const selectedName = document.getElementById('targetPurgeRoommate').value;
+                            if (logData.name && logData.name.toLowerCase() === selectedName.toLowerCase()) {
+                                targetsToDelete.push(logKey);
+                            }
+                        } else if (scope === "missed") {
+                            if (logData.status && logData.status.includes("Missed")) {
+                                targetsToDelete.push(logKey);
+                            }
+                        } else if (scope === "done") {
+                            if (logData.status && logData.status === "Duty Done") {
+                                targetsToDelete.push(logKey);
+                            }
+                        }
+                    });
+
+                    if (targetsToDelete.length === 0) {
+                        alert("No database entries matched your chosen parameter.");
+                        purgeModal.style.display = "none";
+                        return;
+                    }
+
+                    if (confirm(`Are you sure you want to permanently delete these matching logs from the database?`)) {
+                        let deletePromises = targetsToDelete.map(key => db.ref(`room_duty/systemHistoryLogs/${key}`).remove());
+                        
+                        Promise.all(deletePromises).then(() => {
+                            alert("Selected history parameters cleared successfully!");
+                            purgeModal.style.display = "none";
+                        });
+                    }
+                });
             });
 
             document.getElementById('addMemberBtn').addEventListener('click', () => {
@@ -1022,28 +1238,9 @@
                 alert("Date lock cleared!");
             });
 
-            document.getElementById('clearAllBtn').addEventListener('click', () => {
-                if (confirm("Reset everything? This wipes all synchronized cloud parameters and historical branches.")) {
-                    db.ref('room_duty').remove().then(() => {
-                        localStorage.clear();
-                        location.reload();
-                    });
-                }
-            });
-
             setTimeout(() => {
                 if (activeLoggedUser) {
                     setupDashboard(activeLoggedUser);
-                    
-                    // Direct programmatic lock fallback logic to secure Swaraj's active layout presentation
-                    const todayStr = getTodayString();
-                    if (todayStr === "2026-06-27" && appState.rotation.length > 0) {
-                        const targetIdx = appState.rotation.indexOf("Swaraj");
-                        if (targetIdx !== -1 && appState.currentIndex !== targetIdx) {
-                            appState.currentIndex = targetIdx;
-                            pushAppState();
-                        }
-                    }
                 } else {
                     showScreen('loginScreen');
                 }
