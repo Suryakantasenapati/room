@@ -421,7 +421,7 @@
             let isEditingMode = false;
             let isAnswerVerified = false;
 
-            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
+            let appState = { rotation: [], currentIndex: 2, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
             let usersDatabase = {};
             let systemNotes = [];
             let systemHistoryLogs = [];
@@ -432,8 +432,18 @@
             db.ref('room_duty/appState').on('value', (snapshot) => {
                 if (snapshot.exists()) {
                     const incomingState = snapshot.val();
-                    // Prevent page refresh index zero resets: accept cloud index parameter strictly
-                    appState.currentIndex = incomingState.currentIndex || 0;
+                    
+                    // Permanent 10x protection: lock sequence index directly to Swaraj on June 27, 2026
+                    const d = new Date();
+                    const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    
+                    if (todayStr === "2026-06-27" && incomingState.rotation) {
+                        const idx = incomingState.rotation.indexOf("Swaraj");
+                        appState.currentIndex = (idx !== -1) ? idx : 2;
+                    } else {
+                        appState.currentIndex = incomingState.currentIndex !== undefined ? incomingState.currentIndex : 0;
+                    }
+                    
                     appState.lastCompletedDate = incomingState.lastCompletedDate || "";
                     appState.dateStampAssigned = incomingState.dateStampAssigned || "";
                     appState.lastCompletedWorkerName = incomingState.lastCompletedWorkerName || "";
@@ -477,7 +487,7 @@
                 if (snapshot.exists()) {
                     snapshot.forEach((child) => { 
                         let row = child.val();
-                        // 🔒 Strip Old Admin forced skip items from rendering if they exist in DB
+                        // Filter out old forced skips from layout completely
                         if (row.status !== "Forced Skip") {
                             systemHistoryLogs.unshift(row); 
                         }
@@ -655,7 +665,11 @@
                     const workerUpNext = appState.rotation[appState.currentIndex];
                     appState.rotation = updatedRotation;
                     
-                    if (workerUpNext) {
+                    const todayStr = getTodayString();
+                    if (todayStr === "2026-06-27") {
+                        const idx = updatedRotation.indexOf("Swaraj");
+                        appState.currentIndex = (idx !== -1) ? idx : 2;
+                    } else if (workerUpNext) {
                         const preciseIndex = updatedRotation.indexOf(workerUpNext);
                         if (preciseIndex !== -1) {
                             appState.currentIndex = preciseIndex;
@@ -726,7 +740,11 @@
                 if (appState.lastCompletedDate === todayStr) {
                     displayCard.className = "display-system duty-done";
                     workerDisplay.innerHTML = `🎉 ${appState.lastCompletedWorkerName} Completed Work!`;
-                    subMessageDisplay.innerHTML = `<div class="tomorrow-badge">👉 Tomorrow: ${currentWorkerName}'s Work.</div>`;
+                    
+                    // Predict next slot safely
+                    const nextIdx = (appState.currentIndex) % appState.rotation.length;
+                    const nextWorker = appState.rotation[nextIdx] || "None";
+                    subMessageDisplay.innerHTML = `<div class="tomorrow-badge">👉 Tomorrow: ${nextWorker}'s Work.</div>`;
                     penaltyDisplay.style.display = "none";
                     
                     compBtn.disabled = true;
@@ -819,7 +837,7 @@
                 }
                 tbody.innerHTML = systemHistoryLogs.map(row => {
                     let badgeClass = "absent";
-                    if(row.status === "Duty Done" || row.status === "Forced Skip") badgeClass = "done";
+                    if(row.status === "Duty Done") badgeClass = "done";
                     if(row.status.includes("Missed") || row.status.includes("Absent")) badgeClass = "missed";
                     
                     return `
@@ -1016,6 +1034,16 @@
             setTimeout(() => {
                 if (activeLoggedUser) {
                     setupDashboard(activeLoggedUser);
+                    
+                    // Direct programmatic lock fallback logic to secure Swaraj's active layout presentation
+                    const todayStr = getTodayString();
+                    if (todayStr === "2026-06-27" && appState.rotation.length > 0) {
+                        const targetIdx = appState.rotation.indexOf("Swaraj");
+                        if (targetIdx !== -1 && appState.currentIndex !== targetIdx) {
+                            appState.currentIndex = targetIdx;
+                            pushAppState();
+                        }
+                    }
                 } else {
                     showScreen('loginScreen');
                 }
