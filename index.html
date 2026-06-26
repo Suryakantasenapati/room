@@ -453,14 +453,12 @@
                 renderUI();
             });
 
-            // Listen directly for data updates to system notes
             db.ref('room_duty/systemNotes').on('value', (snapshot) => {
                 systemNotes = [];
                 if (snapshot.exists()) {
-                    // Firebase keys sorted oldest to newest, so we keep array ordered correctly
                     snapshot.forEach((child) => {
                         let noteObj = child.val();
-                        noteObj.key = child.key; // preserve child hash reference
+                        noteObj.key = child.key;
                         systemNotes.push(noteObj);
                     });
                 }
@@ -587,8 +585,12 @@
                 const now = new Date();
                 document.getElementById('dateDisplay').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                 
-                if (!appState.dateStampAssigned) {
-                    appState.dateStampAssigned = getTodayString();
+                const todayStr = getTodayString();
+                if (appState.dateStampAssigned && appState.dateStampAssigned !== todayStr) {
+                    appState.dateStampAssigned = todayStr;
+                    pushAppState();
+                } else if (!appState.dateStampAssigned) {
+                    appState.dateStampAssigned = todayStr;
                     pushAppState();
                 }
 
@@ -638,7 +640,6 @@
                 
                 if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
                     const workerUpNext = appState.rotation[appState.currentIndex];
-                    
                     appState.rotation = updatedRotation;
                     
                     if (workerUpNext) {
@@ -730,13 +731,8 @@
 
                     if (isMyTurn) {
                         workerDisplay.innerText = "Your Turn Today!";
-                        if (appState.dateStampAssigned !== todayStr) {
-                            subMessageDisplay.innerText = "⚠️ Shift Obligation Active";
-                            penaltyDisplay.innerText = "🚨 You did not click COMPLETE yesterday! You must do the work again today.";
-                        } else {
-                            subMessageDisplay.innerText = "📋 Complete your shift work.";
-                            penaltyDisplay.style.display = "none";
-                        }
+                        subMessageDisplay.innerText = "📋 Complete your shift work.";
+                        penaltyDisplay.style.display = "none";
 
                         compBtn.disabled = false;
                         compBtn.innerText = "COMPLETE SHIFT";
@@ -745,12 +741,7 @@
                     } else {
                         workerDisplay.innerText = `${currentWorkerName}'s Turn Today`;
                         subMessageDisplay.innerText = "🔮 Next user lineup waiting inside rotation.";
-                        
-                        if (appState.dateStampAssigned !== todayStr) {
-                            penaltyDisplay.innerText = `⚠️ ${currentWorkerName} missed yesterday's completion and is on a rollover penalty today.`;
-                        } else {
-                            penaltyDisplay.style.display = "none";
-                        }
+                        penaltyDisplay.style.display = "none";
 
                         compBtn.disabled = true;
                         compBtn.innerText = "LOCKED";
@@ -775,20 +766,17 @@
                 pushAppState();
             });
 
-            // --- Note Board Control: Auto-caps at exactly 3 latest entries ---
             document.getElementById('addNoteBtn').addEventListener('click', () => {
                 const text = document.getElementById('noteInput').value.trim();
                 if (!text) return alert("Please enter some note content first!");
                 
                 const timestamp = new Date().toLocaleString();
                 
-                // If there are already 3 or more notes, automatically delete the oldest one first
                 if (systemNotes.length >= 3) {
-                    const oldestNoteKey = systemNotes[0].key; // The first item is the oldest in our loaded array
+                    const oldestNoteKey = systemNotes[0].key;
                     db.ref('room_duty/systemNotes/' + oldestNoteKey).remove();
                 }
                 
-                // Add the new note announcement to Firebase
                 db.ref('room_duty/systemNotes').push({
                     user: activeLoggedUser || "Unknown User",
                     text: text,
@@ -805,7 +793,6 @@
                     return;
                 }
                 
-                // Reverse the array clone here so the newest pins show up at the top visually
                 const visualNotes = [...systemNotes].reverse();
                 
                 notesList.innerHTML = visualNotes.map(n => `
@@ -992,11 +979,12 @@
 
             document.getElementById('cancelEditBtn').addEventListener('click', exitEditingState);
 
+            // --- 🔒 FIXED: Admin force actions will NO LONGER push into history ---
             document.getElementById('forceSkipBtn').addEventListener('click', () => {
                 if (!appState.rotation || appState.rotation.length === 0) return;
                 const skippedWorker = appState.rotation[appState.currentIndex];
                 
-                addLogEntry(getTodayString(), skippedWorker, "Forced Skip");
+                // 🛑 addLogEntry completely stripped out here so it never saves to history
                 
                 appState.lastCompletedWorkerName = skippedWorker;
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
