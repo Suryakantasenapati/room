@@ -430,8 +430,15 @@
             const DESIRED_ORDER = ["Surya", "Lucky", "Swaraj", "Swadesh"];
 
             db.ref('room_duty/appState').on('value', (snapshot) => {
-                if (snapshot.exists()) appState = snapshot.val();
-                if (!appState.rotation) appState.rotation = [];
+                if (snapshot.exists()) {
+                    const incomingState = snapshot.val();
+                    // Prevent page refresh index zero resets: accept cloud index parameter strictly
+                    appState.currentIndex = incomingState.currentIndex || 0;
+                    appState.lastCompletedDate = incomingState.lastCompletedDate || "";
+                    appState.dateStampAssigned = incomingState.dateStampAssigned || "";
+                    appState.lastCompletedWorkerName = incomingState.lastCompletedWorkerName || "";
+                    appState.rotation = incomingState.rotation || [];
+                }
                 renderUI();
             });
 
@@ -468,7 +475,13 @@
             db.ref('room_duty/systemHistoryLogs').on('value', (snapshot) => {
                 systemHistoryLogs = [];
                 if (snapshot.exists()) {
-                    snapshot.forEach((child) => { systemHistoryLogs.unshift(child.val()); });
+                    snapshot.forEach((child) => { 
+                        let row = child.val();
+                        // 🔒 Strip Old Admin forced skip items from rendering if they exist in DB
+                        if (row.status !== "Forced Skip") {
+                            systemHistoryLogs.unshift(row); 
+                        }
+                    });
                 }
                 renderReportTable();
                 checkAndLogRollovers();
@@ -646,13 +659,8 @@
                         const preciseIndex = updatedRotation.indexOf(workerUpNext);
                         if (preciseIndex !== -1) {
                             appState.currentIndex = preciseIndex;
-                        } else if (appState.currentIndex >= updatedRotation.length) {
-                            appState.currentIndex = 0;
                         }
-                    } else {
-                        appState.currentIndex = 0;
                     }
-                    
                     pushAppState();
                 }
             }
@@ -979,12 +987,9 @@
 
             document.getElementById('cancelEditBtn').addEventListener('click', exitEditingState);
 
-            // --- 🔒 FIXED: Admin force actions will NO LONGER push into history ---
             document.getElementById('forceSkipBtn').addEventListener('click', () => {
                 if (!appState.rotation || appState.rotation.length === 0) return;
                 const skippedWorker = appState.rotation[appState.currentIndex];
-                
-                // 🛑 addLogEntry completely stripped out here so it never saves to history
                 
                 appState.lastCompletedWorkerName = skippedWorker;
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
