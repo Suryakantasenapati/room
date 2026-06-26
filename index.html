@@ -636,11 +636,31 @@
                 }
             }
 
+            // --- Fixed Unique Rollover Log Engine ---
             function checkAndLogRollovers() {
                 const todayStr = getTodayString();
-                if (appState.rotation && appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr && appState.lastCompletedDate !== appState.dateStampAssigned) {
-                    const missingWorker = appState.rotation[appState.currentIndex];
-                    addLogEntry(appState.dateStampAssigned, missingWorker, "Missed Shift (Rollover)");
+                
+                // Triggered only if the system calendar day rolls over onto a new distinct date
+                if (appState.rotation && appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr) {
+                    
+                    if (appState.lastCompletedDate !== appState.dateStampAssigned) {
+                        const missingWorker = appState.rotation[appState.currentIndex];
+                        
+                        // Strict Verification: scan current memory index to block duplicates
+                        const alreadyLogged = systemHistoryLogs.some(log => 
+                            log.date === appState.dateStampAssigned && 
+                            log.name === missingWorker && 
+                            log.status === "Missed Shift (Rollover)"
+                        );
+                        
+                        if (!alreadyLogged) {
+                            addLogEntry(appState.dateStampAssigned, missingWorker, "Missed Shift (Rollover)");
+                        }
+                    }
+                    
+                    // Immediately lock down the state stamp context to match today's tracking date
+                    appState.dateStampAssigned = todayStr;
+                    pushAppState();
                 }
             }
 
@@ -881,13 +901,10 @@
                 });
             }
 
-            // --- 🔒 ADMIN CHANGE REMOVED FROM HISTORY ---
             window.toggleStatusViaAdmin = function(targetUser) {
                 if (targetUser.toLowerCase() === ADMIN_ID) return;
                 const currentStatus = usersDatabase[targetUser].status || "present";
                 usersDatabase[targetUser].status = (currentStatus === "present") ? "absent" : "present";
-                
-                // Pushes changes quietly to the database without generating a visible history log line
                 pushUsersDatabase(); 
             }
 
