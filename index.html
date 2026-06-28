@@ -469,6 +469,8 @@
                 </div>
 
                 <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
+                <button class="test-btn" id="lockShiftBtn" style="background: #0ea5e9;">🔒 Lock Current User</button>
+                
                 <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
                 <button class="test-btn" id="clearLogsBtn" style="background: var(--danger); margin-top: 14px;">Clear History Logs Only</button>
             </div>
@@ -496,10 +498,10 @@
             const ADMIN_ID = "admin";
             let isEditingMode = false;
             let isAnswerVerified = false;
-
-            // NEW LOCK SYSTEM: Prevents overwriting valid cloud data on page refresh
             let initialAppStateLoaded = false; 
-            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
+            
+            // Added isShiftLocked property to completely freeze the rotation index when triggered
+            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "", isShiftLocked: false };
             
             let usersDatabase = {};
             let systemNotes = [];
@@ -513,7 +515,6 @@
                 
                 // LOGICAL SHIFT OVERRIDE: 
                 // If the current time is before 11:00 AM, count it as yesterday's shift.
-                // This allows a worker to complete their night shift the next morning.
                 if (d.getHours() < 11) {
                     d.setDate(d.getDate() - 1);
                 }
@@ -526,14 +527,14 @@
                     const incomingState = snapshot.val();
                     
                     appState.currentIndex = incomingState.currentIndex !== undefined ? incomingState.currentIndex : 0;
-                    
                     appState.lastCompletedDate = incomingState.lastCompletedDate || "";
                     appState.dateStampAssigned = incomingState.dateStampAssigned || "";
                     appState.lastCompletedWorkerName = incomingState.lastCompletedWorkerName || "";
                     appState.rotation = incomingState.rotation || [];
+                    appState.isShiftLocked = incomingState.isShiftLocked || false;
                 }
                 
-                initialAppStateLoaded = true; // UNLOCK: Real data has finished downloading
+                initialAppStateLoaded = true; 
                 renderUI();
             });
 
@@ -728,8 +729,6 @@
             });
 
             function syncRotationList() {
-                // Prevent the system from saving a blank or incorrect state to Firebase 
-                // before the actual data has downloaded!
                 if (!initialAppStateLoaded) return; 
 
                 const presentUsers = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID && usersDatabase[u].status !== "absent");
@@ -745,7 +744,8 @@
                     const workerUpNext = appState.rotation[appState.currentIndex];
                     appState.rotation = updatedRotation;
                     
-                    if (workerUpNext) {
+                    // 🛡️ CRITICAL LOCK CHECK: Do NOT recalculate index if admin has locked the shift
+                    if (workerUpNext && !appState.isShiftLocked) {
                         const preciseIndex = updatedRotation.indexOf(workerUpNext);
                         if (preciseIndex !== -1) {
                             appState.currentIndex = preciseIndex;
@@ -792,6 +792,18 @@
                 const penaltyDisplay = document.getElementById('penaltyDisplay');
                 const compBtn = document.getElementById('compBtn');
                 const statusMsg = document.getElementById('statusMsg');
+                const lockShiftBtn = document.getElementById('lockShiftBtn');
+
+                // Update Admin Lock Button styling depending on state
+                if (appState.isShiftLocked) {
+                    lockShiftBtn.innerText = "🔓 Unlock Shift";
+                    lockShiftBtn.style.background = "#0284c7";
+                    lockShiftBtn.style.border = "2px solid #38bdf8";
+                } else {
+                    lockShiftBtn.innerText = "🔒 Lock Current User";
+                    lockShiftBtn.style.background = "#0ea5e9";
+                    lockShiftBtn.style.border = "none";
+                }
 
                 if (!appState.rotation || appState.rotation.length === 0) {
                     workerDisplay.innerText = "Lineup Empty";
@@ -811,7 +823,11 @@
                 const currentWorkerName = appState.rotation[appState.currentIndex];
                 const isMyTurn = (activeLoggedUser && activeLoggedUser.toLowerCase() === currentWorkerName.toLowerCase());
 
-                document.getElementById('orderDisplay').innerText = appState.rotation.join(" → ");
+                let orderText = appState.rotation.join(" → ");
+                if (appState.isShiftLocked) {
+                    orderText += ' <span style="color:#0284c7;">(🔒 Locked)</span>';
+                }
+                document.getElementById('orderDisplay').innerHTML = orderText;
 
                 if (appState.lastCompletedDate === todayStr) {
                     displayCard.className = "display-system duty-done";
@@ -860,10 +876,18 @@
                 
                 addLogEntry(todayStr, appState.lastCompletedWorkerName, "Duty Done");
                 
+                // AUTOMATIC UNLOCK when user hits complete
+                appState.isShiftLocked = false; 
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
                 appState.lastCompletedDate = todayStr;
                 appState.dateStampAssigned = todayStr;
                 
+                pushAppState();
+            });
+
+            // LOGIC FOR THE NEW ADMIN LOCK BUTTON
+            document.getElementById('lockShiftBtn').addEventListener('click', () => {
+                appState.isShiftLocked = !appState.isShiftLocked;
                 pushAppState();
             });
 
