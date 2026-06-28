@@ -8,27 +8,38 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         :root { --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); --card-bg: rgba(255, 255, 255, 0.98); --primary: #4f46e5; --success: #10b981; --danger: #ef4444; --text-main: #0f172a; --text-muted: #64748b; --radius-lg: 24px; --radius-md: 16px; --radius-sm: 12px; --shadow-premium: 0 20px 40px rgba(0, 0, 0, 0.3); }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
         body { background: var(--bg-gradient); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
-        .container { background: var(--card-bg); width: 100%; max-width: 460px; padding: 32px 24px; border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); position: relative; margin-bottom: 80px; }
+        .container { background: var(--card-bg); width: 100%; max-width: 460px; padding: 32px 24px; border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 80px; }
         .screen { display: none; }
         .screen.active { display: block; }
         h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 24px; color: #1e1b4b; }
-        .comp-btn { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 1.2rem; padding: 18px; border-radius: var(--radius-md); border: none; cursor: pointer; width: 100%; }
+        .comp-btn { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 1.2rem; padding: 18px; border-radius: var(--radius-md); border: none; width: 100%; cursor: pointer; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); }
         .comp-btn:disabled { background: #e2e2e2; color: #94a3b8; cursor: not-allowed; }
-        .admin-only-panel { display: none; margin-top: 28px; border-top: 2px dashed #cbd5e1; padding-top: 24px; text-align: left; background: #fffdf5; border: 1px solid #fef3c7; border-radius: var(--radius-md); padding: 20px;}
+        .admin-only-panel { display: none; margin-top: 28px; border-top: 2px dashed #cbd5e1; padding-top: 24px; text-align: left; background: #fffdf5; border-radius: var(--radius-md); padding: 20px; }
         .admin-only-panel.is-admin { display: block; }
         .test-btn { background: #d97706; color: white; font-size: 0.9rem; padding: 12px; border-radius: var(--radius-sm); border: none; width: 100%; margin-bottom: 8px; cursor: pointer; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-card { background: #ffffff; padding: 24px; border-radius: var(--radius-md); width: 320px; box-shadow: var(--shadow-premium); text-align: left; }
     </style>
 </head>
 <body>
+    <div id="filterModal" class="modal-overlay">
+        <div class="modal-card">
+            <h2>📄 Export Logs</h2>
+            <button class="primary-btn" id="confirmPrintBtn" style="background:var(--primary); color:white; border:none; padding:10px; width:100%;">Compile PDF</button>
+            <button class="primary-btn" id="closeFilterModalBtn" style="margin-top:10px; padding:10px; width:100%;">Cancel</button>
+        </div>
+    </div>
+
     <div class="container">
         <div id="loginScreen" class="screen active">
             <h2>🔑 Room Duty Login</h2>
             <input type="text" id="loginName" placeholder="Enter Your Name">
             <input type="password" id="loginPin" class="pin-input" maxlength="4" placeholder="••••">
-            <button class="primary-btn" id="enterBtn" style="width:100%; padding:14px; background:#4f46e5; color:white; border:none; border-radius:8px; cursor:pointer;">Unlock Dashboard</button>
+            <button class="primary-btn" id="enterBtn" style="width:100%; padding:14px; background:#4f46e5; color:white; border:none; border-radius:8px;">Unlock</button>
         </div>
+
         <div id="dashboardScreen" class="screen">
             <h2 id="welcomeUser">Welcome</h2>
             <div id="displayCard" style="background:#f8fafc; padding:32px 16px; border-radius:16px; margin-bottom:24px;">
@@ -36,11 +47,12 @@
             </div>
             <button id="compBtn" class="comp-btn">COMPLETE SHIFT</button>
             <div id="orderDisplay" style="margin-top:20px; font-weight: 600; color: #475569;"></div>
+            
             <div id="adminPanel" class="admin-only-panel">
                 <button class="test-btn" id="lockShiftBtn" style="background: #0ea5e9;">🔒 Lock Current User</button>
                 <button class="test-btn" id="forceSkipBtn">Skip Shift</button>
             </div>
-            <button style="width:100%; padding:12px; margin-top:20px; background:#64748b; color:white; border:none; border-radius:8px; cursor:pointer;" id="logOutBtn">Log Out</button>
+            <button id="logOutBtn" style="width:100%; padding:12px; margin-top:20px; background:#64748b; color:white; border:none; border-radius:8px;">Log Out</button>
         </div>
     </div>
 
@@ -55,10 +67,14 @@
             let activeLoggedUser = localStorage.getItem('activeTeamUser') || null;
             const DESIRED_ORDER = ["Surya", "Lucky", "Swaraj", "Swadesh"];
 
+            function getTodayString() {
+                const d = new Date();
+                if (d.getHours() < 11) d.setDate(d.getDate() - 1);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+
             db.ref('room_duty/appState').on('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    appState = snapshot.val();
-                }
+                if (snapshot.exists()) appState = snapshot.val();
                 renderUI();
             });
 
@@ -77,17 +93,15 @@
                     appState.rotation = newRotation;
                     
                     if (appState.isShiftLocked) {
-                        // Find the index of the locked worker
+                        // NAME-BASED LOCKING: Find where the locked user moved to
                         const idx = newRotation.indexOf(appState.lockedWorkerName);
                         if (idx !== -1) {
                             appState.currentIndex = idx;
                         } else {
-                            // If locked worker marked themselves absent, force unlock
                             appState.isShiftLocked = false;
                             appState.currentIndex = 0;
                         }
                     } else {
-                        // Normal rotation
                         const idx = newRotation.indexOf(currentWorkerName);
                         appState.currentIndex = (idx !== -1) ? idx : 0;
                     }
@@ -97,22 +111,14 @@
 
             function renderUI() {
                 syncRotationList();
-                const currentWorkerName = appState.rotation[appState.currentIndex];
-                const workerDisplay = document.getElementById('workerDisplay');
-                const lockShiftBtn = document.getElementById('lockShiftBtn');
-
-                if (appState.isShiftLocked) {
-                    lockShiftBtn.innerText = "🔓 Unlock Shift";
-                    lockShiftBtn.style.background = "#0284c7";
-                    workerDisplay.innerText = `${currentWorkerName} (LOCKED)`;
-                } else {
-                    lockShiftBtn.innerText = "🔒 Lock Current User";
-                    lockShiftBtn.style.background = "#0ea5e9";
-                    workerDisplay.innerText = `${currentWorkerName}'s Turn`;
-                }
-
+                const currentWorkerName = appState.rotation[appState.currentIndex] || "None";
+                document.getElementById('workerDisplay').innerText = appState.isShiftLocked ? `${currentWorkerName} (LOCKED)` : `${currentWorkerName}'s Turn`;
                 document.getElementById('orderDisplay').innerHTML = appState.rotation.join(" → ") + (appState.isShiftLocked ? " <b style='color:blue'>(Locked)</b>" : "");
                 document.getElementById('compBtn').disabled = (activeLoggedUser !== currentWorkerName);
+                
+                const lockBtn = document.getElementById('lockShiftBtn');
+                lockBtn.innerText = appState.isShiftLocked ? "🔓 Unlock Shift" : "🔒 Lock Current User";
+                lockBtn.style.background = appState.isShiftLocked ? "#0284c7" : "#0ea5e9";
             }
 
             document.getElementById('compBtn').addEventListener('click', () => {
@@ -132,9 +138,7 @@
                 if (usersDatabase[name]) {
                     activeLoggedUser = name;
                     localStorage.setItem('activeTeamUser', name);
-                    document.getElementById('dashboardScreen').classList.add('active');
-                    document.getElementById('loginScreen').classList.remove('active');
-                    if (name === "admin") document.getElementById('adminPanel').classList.add('is-admin');
+                    location.reload();
                 }
             });
 
@@ -142,6 +146,14 @@
                 localStorage.removeItem('activeTeamUser');
                 location.reload();
             });
+
+            setTimeout(() => {
+                if (activeLoggedUser) {
+                    document.getElementById('dashboardScreen').classList.add('active');
+                    document.getElementById('loginScreen').classList.remove('active');
+                    if (activeLoggedUser === "admin") document.getElementById('adminPanel').classList.add('is-admin');
+                }
+            }, 500);
         })();
     </script>
 </body>
