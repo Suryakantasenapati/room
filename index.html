@@ -323,7 +323,6 @@
         </table>
     </div>
 
-    <!-- Download/Print Configuration Modal Filter -->
     <div id="filterModal" class="modal-overlay">
         <div class="modal-card">
             <h2 style="font-size:1.2rem; margin-bottom:16px;">📄 Export Parameters</h2>
@@ -343,7 +342,6 @@
         </div>
     </div>
 
-    <!-- Targeted Purge Filter Configuration Modal -->
     <div id="purgeModal" class="modal-overlay">
         <div class="modal-card" style="border: 1px solid #fecaca;">
             <h2 style="font-size:1.2rem; margin-bottom:16px; color:var(--danger)">⚠️ Selective Log Purge Panel</h2>
@@ -472,7 +470,6 @@
 
                 <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
                 <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
-                <!-- 🛠️ Replaced image_27c0dc.png button perfectly with smart selective filter panel -->
                 <button class="test-btn" id="clearLogsBtn" style="background: var(--danger); margin-top: 14px;">Clear History Logs Only</button>
             </div>
 
@@ -500,7 +497,10 @@
             let isEditingMode = false;
             let isAnswerVerified = false;
 
-            let appState = { rotation: [], currentIndex: 2, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
+            // NEW LOCK SYSTEM: Prevents overwriting valid cloud data on page refresh
+            let initialAppStateLoaded = false; 
+            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "" };
+            
             let usersDatabase = {};
             let systemNotes = [];
             let systemHistoryLogs = [];
@@ -532,6 +532,8 @@
                     appState.lastCompletedWorkerName = incomingState.lastCompletedWorkerName || "";
                     appState.rotation = incomingState.rotation || [];
                 }
+                
+                initialAppStateLoaded = true; // UNLOCK: Real data has finished downloading
                 renderUI();
             });
 
@@ -570,7 +572,7 @@
                 if (snapshot.exists()) {
                     snapshot.forEach((child) => { 
                         let row = child.val();
-                        row.key = child.key; // store key hash reference for individual targeted deletions
+                        row.key = child.key; 
                         if (row.status !== "Forced Skip") {
                             systemHistoryLogs.unshift(row); 
                         }
@@ -726,6 +728,10 @@
             });
 
             function syncRotationList() {
+                // Prevent the system from saving a blank or incorrect state to Firebase 
+                // before the actual data has downloaded!
+                if (!initialAppStateLoaded) return; 
+
                 const presentUsers = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID && usersDatabase[u].status !== "absent");
                 const updatedRotation = DESIRED_ORDER.filter(user => presentUsers.some(p => p.toLowerCase() === user.toLowerCase()));
                 
@@ -1017,7 +1023,6 @@
                 purgeScopeInputContainer.innerHTML = "";
                 
                 if (scope === "roommate") {
-                    // Populate present roommate dropdown list dynamically
                     const roommates = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID);
                     let options = roommates.map(r => `<option value="${r}">${r}</option>`).join('');
                     purgeScopeInputContainer.innerHTML = `
@@ -1030,7 +1035,6 @@
             document.getElementById('confirmPurgeBtn').addEventListener('click', () => {
                 const scope = purgeScope.value;
                 
-                // Read fresh un-reversed snapshot straight from DB schema map context
                 db.ref('room_duty/systemHistoryLogs').once('value', (snapshot) => {
                     if (!snapshot.exists()) {
                         alert("The logs branch is already completely empty.");
