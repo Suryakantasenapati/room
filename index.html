@@ -508,18 +508,24 @@
 
             const DESIRED_ORDER = ["Surya", "Lucky", "Swaraj", "Swadesh"];
 
+            function getTodayString() {
+                const d = new Date();
+                
+                // LOGICAL SHIFT OVERRIDE: 
+                // If the current time is before 11:00 AM, count it as yesterday's shift.
+                // This allows a worker to complete their night shift the next morning.
+                if (d.getHours() < 11) {
+                    d.setDate(d.getDate() - 1);
+                }
+                
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+
             db.ref('room_duty/appState').on('value', (snapshot) => {
                 if (snapshot.exists()) {
                     const incomingState = snapshot.val();
-                    const d = new Date();
-                    const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                     
-                    if (todayStr === "2026-06-27" && incomingState.rotation) {
-                        const idx = incomingState.rotation.indexOf("Swaraj");
-                        appState.currentIndex = (idx !== -1) ? idx : 2;
-                    } else {
-                        appState.currentIndex = incomingState.currentIndex !== undefined ? incomingState.currentIndex : 0;
-                    }
+                    appState.currentIndex = incomingState.currentIndex !== undefined ? incomingState.currentIndex : 0;
                     
                     appState.lastCompletedDate = incomingState.lastCompletedDate || "";
                     appState.dateStampAssigned = incomingState.dateStampAssigned || "";
@@ -672,11 +678,6 @@
                 showScreen('loginScreen');
             });
 
-            function getTodayString() {
-                const d = new Date();
-                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            }
-
             function setupDashboard(username) {
                 showScreen('dashboardScreen');
                 const isUserAdmin = (username.toLowerCase() === ADMIN_ID);
@@ -738,11 +739,7 @@
                     const workerUpNext = appState.rotation[appState.currentIndex];
                     appState.rotation = updatedRotation;
                     
-                    const todayStr = getTodayString();
-                    if (todayStr === "2026-06-27") {
-                        const idx = updatedRotation.indexOf("Swaraj");
-                        appState.currentIndex = (idx !== -1) ? idx : 2;
-                    } else if (workerUpNext) {
+                    if (workerUpNext) {
                         const preciseIndex = updatedRotation.indexOf(workerUpNext);
                         if (preciseIndex !== -1) {
                             appState.currentIndex = preciseIndex;
