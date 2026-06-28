@@ -7,34 +7,13 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-        :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            --card-bg: rgba(255, 255, 255, 0.98);
-            --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            --success: #10b981;
-            --danger: #ef4444;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --radius-lg: 24px;
-            --radius-md: 16px;
-            --radius-sm: 12px;
-            --shadow-premium: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-
+        :root { --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); --card-bg: rgba(255, 255, 255, 0.98); --primary: #4f46e5; --success: #10b981; --danger: #ef4444; --text-main: #0f172a; --text-muted: #64748b; --radius-lg: 24px; --radius-md: 16px; --radius-sm: 12px; --shadow-premium: 0 20px 40px rgba(0, 0, 0, 0.3); }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { background: var(--bg-gradient); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
         .container { background: var(--card-bg); width: 100%; max-width: 460px; padding: 32px 24px; border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); position: relative; margin-bottom: 80px; }
         .screen { display: none; }
         .screen.active { display: block; }
         h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 24px; color: #1e1b4b; }
-        h3 { font-size: 1.1rem; font-weight: 700; margin: 20px 0 10px 0; color: #1e1b4b; text-align: left; }
-        .live-date { font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; text-align: left; }
-        .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .status-toggle-btn { width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 700; border-radius: 20px; text-transform: uppercase; }
-        .display-system { background: #f8fafc; border: 1px solid #e2e8f0; padding: 32px 16px; border-radius: var(--radius-md); margin-bottom: 24px; }
-        .display-system.duty-done { background: #dcfce7; border-color: #bbf7d0; }
-        .current-worker { font-size: 2.1rem; font-weight: 900; color: #1e1b4b; line-height: 1.2; text-transform: capitalize; }
         .comp-btn { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 1.2rem; padding: 18px; border-radius: var(--radius-md); border: none; cursor: pointer; width: 100%; }
         .comp-btn:disabled { background: #e2e2e2; color: #94a3b8; cursor: not-allowed; }
         .admin-only-panel { display: none; margin-top: 28px; border-top: 2px dashed #cbd5e1; padding-top: 24px; text-align: left; background: #fffdf5; border: 1px solid #fef3c7; border-radius: var(--radius-md); padding: 20px;}
@@ -43,7 +22,6 @@
     </style>
 </head>
 <body>
-
     <div class="container">
         <div id="loginScreen" class="screen active">
             <h2>🔑 Room Duty Login</h2>
@@ -51,74 +29,36 @@
             <input type="password" id="loginPin" class="pin-input" maxlength="4" placeholder="••••">
             <button class="primary-btn" id="enterBtn" style="width:100%; padding:14px; background:#4f46e5; color:white; border:none; border-radius:8px; cursor:pointer;">Unlock Dashboard</button>
         </div>
-
         <div id="dashboardScreen" class="screen">
-            <div class="header-container">
-                <div id="dateDisplay" class="live-date">...</div>
-                <button id="userStatusToggle" class="status-toggle-btn">Status</button>
-            </div>
-            
             <h2 id="welcomeUser">Welcome</h2>
-            
-            <div id="displayCard" class="display-system">
-                <div id="workerDisplay" class="current-worker">Loading...</div>
-                <div id="subMessageDisplay" style="margin-top:10px; font-weight:600; color:#64748b;"></div>
+            <div id="displayCard" style="background:#f8fafc; padding:32px 16px; border-radius:16px; margin-bottom:24px;">
+                <div id="workerDisplay" style="font-size: 2.1rem; font-weight: 900; color: #1e1b4b;">Loading...</div>
             </div>
-
             <button id="compBtn" class="comp-btn">COMPLETE SHIFT</button>
-            <div id="statusMsg" style="margin-top:15px; font-weight:bold;"></div>
-
-            <div class="team-list" id="lineupSection">
-                <strong style="color: #1e1b4b; display: block; margin-bottom: 4px;">🔄 Current Rotation:</strong>
-                <div id="orderDisplay" style="font-weight: 600; color: #475569; text-transform: capitalize;">None</div>
-            </div>
-
+            <div id="orderDisplay" style="margin-top:20px; font-weight: 600; color: #475569;"></div>
             <div id="adminPanel" class="admin-only-panel">
-                <div style="font-weight:800; color:#b45309; margin-bottom:14px;">👑 Admin Control</div>
-                <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
                 <button class="test-btn" id="lockShiftBtn" style="background: #0ea5e9;">🔒 Lock Current User</button>
-                <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
+                <button class="test-btn" id="forceSkipBtn">Skip Shift</button>
             </div>
-
             <button style="width:100%; padding:12px; margin-top:20px; background:#64748b; color:white; border:none; border-radius:8px; cursor:pointer;" id="logOutBtn">Log Out</button>
         </div>
     </div>
 
     <script>
         (function() {
-            const firebaseConfig = {
-                apiKey: "AIzaSyCuC79-34tkdLSM9L1i7s-zw77emi0qDt0",
-                authDomain: "room-362c3.firebaseapp.com",
-                databaseURL: "https://room-362c3-default-rtdb.firebaseio.com",
-                projectId: "room-362c3",
-                storageBucket: "room-362c3.appspot.com"
-            };
-
+            const firebaseConfig = { apiKey: "AIzaSyCuC79-34tkdLSM9L1i7s-zw77emi0qDt0", authDomain: "room-362c3.firebaseapp.com", databaseURL: "https://room-362c3-default-rtdb.firebaseio.com", projectId: "room-362c3", storageBucket: "room-362c3.appspot.com" };
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
-
-            const ADMIN_ID = "admin";
-            let initialAppStateLoaded = false; 
-            let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", isShiftLocked: false };
+            
+            let appState = { rotation: [], currentIndex: 0, isShiftLocked: false, lockedWorkerName: "" };
             let usersDatabase = {};
             let activeLoggedUser = localStorage.getItem('activeTeamUser') || null;
             const DESIRED_ORDER = ["Surya", "Lucky", "Swaraj", "Swadesh"];
 
-            function getTodayString() {
-                const d = new Date();
-                if (d.getHours() < 11) d.setDate(d.getDate() - 1);
-                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            }
-
             db.ref('room_duty/appState').on('value', (snapshot) => {
                 if (snapshot.exists()) {
-                    const incomingState = snapshot.val();
-                    appState.currentIndex = incomingState.currentIndex || 0;
-                    appState.lastCompletedDate = incomingState.lastCompletedDate || "";
-                    appState.rotation = incomingState.rotation || [];
-                    appState.isShiftLocked = incomingState.isShiftLocked || false;
+                    appState = snapshot.val();
                 }
-                initialAppStateLoaded = true; 
                 renderUI();
             });
 
@@ -127,102 +67,81 @@
                 renderUI();
             });
 
-            function pushAppState() { db.ref('room_duty/appState').set(appState); }
-
             function syncRotationList() {
-                if (!initialAppStateLoaded) return; 
-
-                const presentUsers = Object.keys(usersDatabase).filter(u => u.toLowerCase() !== ADMIN_ID && usersDatabase[u].status !== "absent");
-                const updatedRotation = DESIRED_ORDER.filter(user => presentUsers.includes(user));
-                presentUsers.forEach(u => { if (!DESIRED_ORDER.includes(u)) updatedRotation.push(u); });
+                const presentUsers = Object.keys(usersDatabase).filter(u => u !== "admin" && usersDatabase[u].status !== "absent");
+                const newRotation = DESIRED_ORDER.filter(user => presentUsers.includes(user));
+                presentUsers.forEach(u => { if (!DESIRED_ORDER.includes(u)) newRotation.push(u); });
                 
-                if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
-                    const workerUpNext = appState.rotation[appState.currentIndex];
-                    appState.rotation = updatedRotation;
+                if (JSON.stringify(appState.rotation) !== JSON.stringify(newRotation)) {
+                    let currentWorkerName = appState.rotation[appState.currentIndex];
+                    appState.rotation = newRotation;
                     
-                    // THE FIX: If locked, stop the index from resetting
                     if (appState.isShiftLocked) {
-                         if (appState.currentIndex >= appState.rotation.length) appState.currentIndex = 0;
+                        // Find the index of the locked worker
+                        const idx = newRotation.indexOf(appState.lockedWorkerName);
+                        if (idx !== -1) {
+                            appState.currentIndex = idx;
+                        } else {
+                            // If locked worker marked themselves absent, force unlock
+                            appState.isShiftLocked = false;
+                            appState.currentIndex = 0;
+                        }
                     } else {
-                         if (workerUpNext) {
-                             const idx = updatedRotation.indexOf(workerUpNext);
-                             appState.currentIndex = (idx !== -1) ? idx : 0;
-                         }
+                        // Normal rotation
+                        const idx = newRotation.indexOf(currentWorkerName);
+                        appState.currentIndex = (idx !== -1) ? idx : 0;
                     }
-                    pushAppState();
+                    db.ref('room_duty/appState').set(appState);
                 }
             }
 
             function renderUI() {
                 syncRotationList();
-
-                const todayStr = getTodayString();
+                const currentWorkerName = appState.rotation[appState.currentIndex];
                 const workerDisplay = document.getElementById('workerDisplay');
-                const compBtn = document.getElementById('compBtn');
                 const lockShiftBtn = document.getElementById('lockShiftBtn');
 
                 if (appState.isShiftLocked) {
                     lockShiftBtn.innerText = "🔓 Unlock Shift";
                     lockShiftBtn.style.background = "#0284c7";
+                    workerDisplay.innerText = `${currentWorkerName} (LOCKED)`;
                 } else {
                     lockShiftBtn.innerText = "🔒 Lock Current User";
                     lockShiftBtn.style.background = "#0ea5e9";
+                    workerDisplay.innerText = `${currentWorkerName}'s Turn`;
                 }
 
-                if (!appState.rotation || appState.rotation.length === 0) return;
-                
-                const currentWorkerName = appState.rotation[appState.currentIndex];
-                const isMyTurn = (activeLoggedUser && activeLoggedUser.toLowerCase() === currentWorkerName.toLowerCase());
-
-                // UI updates
-                workerDisplay.innerText = appState.isShiftLocked ? `${currentWorkerName} (LOCKED)` : `${currentWorkerName}'s Turn`;
                 document.getElementById('orderDisplay').innerHTML = appState.rotation.join(" → ") + (appState.isShiftLocked ? " <b style='color:blue'>(Locked)</b>" : "");
-                
-                if (appState.lastCompletedDate === todayStr) {
-                    compBtn.disabled = true;
-                    compBtn.innerText = "COMPLETED";
-                } else {
-                    compBtn.disabled = !isMyTurn;
-                    compBtn.innerText = isMyTurn ? "COMPLETE SHIFT" : "LOCKED";
-                }
+                document.getElementById('compBtn').disabled = (activeLoggedUser !== currentWorkerName);
             }
 
             document.getElementById('compBtn').addEventListener('click', () => {
-                appState.lastCompletedDate = getTodayString();
-                appState.isShiftLocked = false; // Auto-unlock on completion
+                appState.isShiftLocked = false;
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
-                pushAppState();
+                db.ref('room_duty/appState').set(appState);
             });
 
             document.getElementById('lockShiftBtn').addEventListener('click', () => {
                 appState.isShiftLocked = !appState.isShiftLocked;
-                pushAppState();
+                appState.lockedWorkerName = appState.rotation[appState.currentIndex];
+                db.ref('room_duty/appState').set(appState);
             });
 
             document.getElementById('enterBtn').addEventListener('click', () => {
-                const nameInput = document.getElementById('loginName').value.trim();
-                const registeredName = Object.keys(usersDatabase).find(u => u.toLowerCase() === nameInput.toLowerCase());
-                if (registeredName) {
-                    activeLoggedUser = registeredName;
-                    localStorage.setItem('activeTeamUser', registeredName);
+                const name = document.getElementById('loginName').value.trim();
+                if (usersDatabase[name]) {
+                    activeLoggedUser = name;
+                    localStorage.setItem('activeTeamUser', name);
                     document.getElementById('dashboardScreen').classList.add('active');
                     document.getElementById('loginScreen').classList.remove('active');
-                    if (registeredName.toLowerCase() === ADMIN_ID) document.getElementById('adminPanel').classList.add('is-admin');
-                } else alert("User not found.");
+                    if (name === "admin") document.getElementById('adminPanel').classList.add('is-admin');
+                }
             });
 
             document.getElementById('logOutBtn').addEventListener('click', () => {
                 localStorage.removeItem('activeTeamUser');
                 location.reload();
             });
-
-            setTimeout(() => {
-                if (activeLoggedUser) {
-                    document.getElementById('dashboardScreen').classList.add('active');
-                    document.getElementById('loginScreen').classList.remove('active');
-                    if (activeLoggedUser.toLowerCase() === ADMIN_ID) document.getElementById('adminPanel').classList.add('is-admin');
-                }
-            }, 500);
         })();
     </script>
 </body>
