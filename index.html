@@ -469,6 +469,7 @@
                 </div>
 
                 <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
+                
                 <button class="test-btn" id="lockShiftBtn" style="background: #0ea5e9;">🔒 Lock Current User</button>
                 
                 <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
@@ -500,7 +501,6 @@
             let isAnswerVerified = false;
             let initialAppStateLoaded = false; 
             
-            // Added isShiftLocked property to completely freeze the rotation index when triggered
             let appState = { rotation: [], currentIndex: 0, lastCompletedDate: "", dateStampAssigned: "", lastCompletedWorkerName: "", isShiftLocked: false };
             
             let usersDatabase = {};
@@ -514,7 +514,6 @@
                 const d = new Date();
                 
                 // LOGICAL SHIFT OVERRIDE: 
-                // If the current time is before 11:00 AM, count it as yesterday's shift.
                 if (d.getHours() < 11) {
                     d.setDate(d.getDate() - 1);
                 }
@@ -744,7 +743,6 @@
                     const workerUpNext = appState.rotation[appState.currentIndex];
                     appState.rotation = updatedRotation;
                     
-                    // 🛡️ CRITICAL LOCK CHECK: Do NOT recalculate index if admin has locked the shift
                     if (workerUpNext && !appState.isShiftLocked) {
                         const preciseIndex = updatedRotation.indexOf(workerUpNext);
                         if (preciseIndex !== -1) {
@@ -794,7 +792,6 @@
                 const statusMsg = document.getElementById('statusMsg');
                 const lockShiftBtn = document.getElementById('lockShiftBtn');
 
-                // Update Admin Lock Button styling depending on state
                 if (appState.isShiftLocked) {
                     lockShiftBtn.innerText = "🔓 Unlock Shift";
                     lockShiftBtn.style.background = "#0284c7";
@@ -876,7 +873,6 @@
                 
                 addLogEntry(todayStr, appState.lastCompletedWorkerName, "Duty Done");
                 
-                // AUTOMATIC UNLOCK when user hits complete
                 appState.isShiftLocked = false; 
                 appState.currentIndex = (appState.currentIndex + 1) % appState.rotation.length;
                 appState.lastCompletedDate = todayStr;
@@ -885,7 +881,6 @@
                 pushAppState();
             });
 
-            // LOGIC FOR THE NEW ADMIN LOCK BUTTON
             document.getElementById('lockShiftBtn').addEventListener('click', () => {
                 appState.isShiftLocked = !appState.isShiftLocked;
                 pushAppState();
@@ -949,7 +944,6 @@
                 }).join('');
             }
 
-            // --- Premium Modal Component Filter Control ---
             const filterModal = document.getElementById('filterModal');
             const filterScope = document.getElementById('filterScope');
             const scopeInputContainer = document.getElementById('scopeInputContainer');
@@ -1027,7 +1021,6 @@
                 window.print();
             });
 
-            // --- Advanced Admin Selective Purge Control Panel Engine ---
             const purgeModal = document.getElementById('purgeModal');
             const purgeScope = document.getElementById('purgeScope');
             const purgeScopeInputContainer = document.getElementById('purgeScopeInputContainer');
