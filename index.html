@@ -326,7 +326,6 @@
     <div id="filterModal" class="modal-overlay">
         <div class="modal-card">
             <h2 style="font-size:1.2rem; margin-bottom:16px;">📄 Export Parameters</h2>
-            
             <label>Filter Configuration Scope:</label>
             <select id="filterScope" class="select-input">
                 <option value="all">Export Entire History Logs</option>
@@ -334,9 +333,7 @@
                 <option value="month">Select Specific Month</option>
                 <option value="year">Select Specific Year</option>
             </select>
-
             <div id="scopeInputContainer"></div>
-
             <button class="primary-btn" id="confirmPrintBtn" style="margin-bottom:8px;">Compile Document</button>
             <button class="primary-btn" id="closeFilterModalBtn" style="background:#64748b; margin-bottom:0;">Cancel</button>
         </div>
@@ -345,7 +342,6 @@
     <div id="purgeModal" class="modal-overlay">
         <div class="modal-card" style="border: 1px solid #fecaca;">
             <h2 style="font-size:1.2rem; margin-bottom:16px; color:var(--danger)">⚠️ Selective Log Purge Panel</h2>
-            
             <label>What data type do you want to clear permanently?</label>
             <select id="purgeScope" class="select-input">
                 <option value="all">Wipe Entire History Logs</option>
@@ -353,9 +349,7 @@
                 <option value="missed">Clear "Missed Shift" Logs Only</option>
                 <option value="done">Clear "Duty Done" Logs Only</option>
             </select>
-
             <div id="purgeScopeInputContainer" style="margin-bottom:12px;"></div>
-
             <button class="primary-btn" id="confirmPurgeBtn" style="background:var(--danger); margin-bottom:8px;">Permanently Delete</button>
             <button class="primary-btn" id="closePurgeModalBtn" style="background:#64748b; margin-bottom:0;">Cancel</button>
         </div>
@@ -469,9 +463,7 @@
                 </div>
 
                 <button class="test-btn" id="forceSkipBtn">Skip Shift Right Now</button>
-                
                 <button class="test-btn" id="lockShiftBtn" style="background: #0ea5e9;">🔒 Lock Current User</button>
-                
                 <button class="test-btn" id="resetLockBtn" style="background: var(--text-muted);">Clear Today's Lockout</button>
                 <button class="test-btn" id="clearLogsBtn" style="background: var(--danger); margin-top: 14px;">Clear History Logs Only</button>
             </div>
@@ -513,7 +505,6 @@
             function getTodayString() {
                 const d = new Date();
                 
-                // LOGICAL SHIFT OVERRIDE: 
                 if (d.getHours() < 11) {
                     d.setDate(d.getDate() - 1);
                 }
@@ -740,13 +731,18 @@
                 });
                 
                 if (JSON.stringify(appState.rotation) !== JSON.stringify(updatedRotation)) {
-                    const workerUpNext = appState.rotation[appState.currentIndex];
+                    // EXACT FIX: Identify who has the turn right now
+                    const workerCurrentlyHoldingTurn = appState.rotation[appState.currentIndex];
                     appState.rotation = updatedRotation;
                     
-                    if (workerUpNext && !appState.isShiftLocked) {
-                        const preciseIndex = updatedRotation.indexOf(workerUpNext);
+                    // We must ALWAYS properly recalculate the index, even if the shift is locked! 
+                    // This stops the system from breaking and defaulting to 0 (Surya)
+                    if (workerCurrentlyHoldingTurn) {
+                        const preciseIndex = updatedRotation.indexOf(workerCurrentlyHoldingTurn);
                         if (preciseIndex !== -1) {
                             appState.currentIndex = preciseIndex;
+                        } else {
+                            appState.currentIndex = 0; // Safe fallback only if the user was literally deleted
                         }
                     }
                     pushAppState();
@@ -756,6 +752,10 @@
             function checkAndLogRollovers() {
                 const todayStr = getTodayString();
                 
+                // EXACT FIX: If the Admin locks a user, freeze the date rollover completely 
+                // so the user is absolutely safe from getting a "Missed Shift" penalty.
+                if (appState.isShiftLocked) return;
+
                 if (appState.rotation && appState.rotation.length > 0 && appState.dateStampAssigned && appState.dateStampAssigned !== todayStr) {
                     if (appState.lastCompletedDate !== appState.dateStampAssigned) {
                         const missingWorker = appState.rotation[appState.currentIndex];
@@ -790,16 +790,33 @@
                 const penaltyDisplay = document.getElementById('penaltyDisplay');
                 const compBtn = document.getElementById('compBtn');
                 const statusMsg = document.getElementById('statusMsg');
+                
                 const lockShiftBtn = document.getElementById('lockShiftBtn');
+                const forceSkipBtn = document.getElementById('forceSkipBtn');
 
+                // Button safety formatting
                 if (appState.isShiftLocked) {
                     lockShiftBtn.innerText = "🔓 Unlock Shift";
                     lockShiftBtn.style.background = "#0284c7";
                     lockShiftBtn.style.border = "2px solid #38bdf8";
+                    
+                    // Disable Skip Button completely when locked
+                    if (forceSkipBtn) {
+                        forceSkipBtn.disabled = true;
+                        forceSkipBtn.style.background = "#cbd5e1";
+                        forceSkipBtn.innerText = "Skip Disabled (Shift is Locked)";
+                    }
                 } else {
                     lockShiftBtn.innerText = "🔒 Lock Current User";
                     lockShiftBtn.style.background = "#0ea5e9";
                     lockShiftBtn.style.border = "none";
+                    
+                    // Re-enable Skip Button
+                    if (forceSkipBtn) {
+                        forceSkipBtn.disabled = false;
+                        forceSkipBtn.style.background = "#d97706";
+                        forceSkipBtn.innerText = "Skip Shift Right Now";
+                    }
                 }
 
                 if (!appState.rotation || appState.rotation.length === 0) {
